@@ -12,6 +12,7 @@ Un mini CRM de prospection, construit lot par lot.
 - `pnpm build` : construire l'app
 - `pnpm start` : lancer l'app construite
 - `pnpm lint` : vérifier le code avec ESLint
+- `pnpm test` : lancer les tests (Vitest)
 
 ## Stack
 - Next.js 16 (App Router, dossier `app/`), React 19, TypeScript, Tailwind CSS 4.
