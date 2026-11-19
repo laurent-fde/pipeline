@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline · Design systems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: Inter, system-ui, sans-serif; background: #f4f4f5; color: #18181b; padding: 32px 16px 64px; }
+  header.page { max-width: 1280px; margin: 0 auto 28px; }
+  header.page h1 { font-size: 26px; font-weight: 700; }
+  header.page p { color: #52525b; margin-top: 6px; max-width: 760px; line-height: 1.5; }
+  .grid { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
+
+  /* ---------- Chaque design system = un jeu de variables ---------- */
+  .ds {
+    background: var(--bg); color: var(--fg); font-family: var(--font-body);
+    border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 22px;
+  }
+  .ds h2 { font-family: var(--font-head); font-size: 22px; font-weight: 600; }
+  .ds .tag { display: inline-block; font-size: 12px; color: var(--muted-fg); margin-top: 4px; }
+  .ds h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-fg); margin-bottom: 10px; font-weight: 600; }
+
+  .swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .sw { height: 44px; border-radius: var(--radius); border: 1px solid var(--border); position: relative; }
+  .sw span { position: absolute; bottom: -18px; left: 0; font-size: 10px; color: var(--muted-fg); white-space: nowrap; }
+  .swatches + .spacer { height: 14px; }
+
+  .type .t1 { font-family: var(--font-head); font-size: 28px; font-weight: 600; line-height: 1.15; }
+  .type .t2 { font-size: 15px; line-height: 1.5; margin-top: 6px; }
+  .type .t3 { font-size: 13px; color: var(--muted-fg); margin-top: 4px; }
+  .type .t4 { font-family: var(--font-mono); font-size: 12px; color: var(--muted-fg); margin-top: 6px; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .btn { font: inherit; font-size: 14px; font-weight: 500; padding: 9px 16px; border-radius: var(--radius); border: 1px solid transparent; cursor: pointer; }
+  .btn.primary { background: var(--primary); color: var(--primary-fg); }
+  .btn.secondary { background: var(--secondary); color: var(--secondary-fg); border-color: var(--border); }
+  .btn.ghost { background: transparent; color: var(--fg); }
+  .btn.ghost:hover { background: var(--muted); }
+  .btn.danger { background: var(--danger); color: #fff; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .field label { font-size: 13px; font-weight: 500; }
+  .field input, .field select {
+    font: inherit; font-size: 14px; padding: 9px 12px; border-radius: var(--radius);
+    border: 1px solid var(--input); background: var(--card); color: var(--fg);
+  }
+  .field input:focus, .field select:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
+  .field.error input { border-color: var(--danger); }
+  .field .hint { font-size: 12px; color: var(--danger); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 10px;
+  }
+  .card .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  .avatar { width: 36px; height: 36px; border-radius: 999px; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; font-weight: 600; font-size: 14px; flex: none; }
+  .who { display: flex; gap: 10px; align-items: center; }
+  .who strong { display: block; font-size: 15px; }
+  .who small { color: var(--muted-fg); font-size: 13px; }
+  .badge { font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 999px; background: var(--badge-bg); color: var(--badge-fg); white-space: nowrap; }
+  .relance { font-size: 13px; display: flex; align-items: center; gap: 6px; color: var(--warn-fg); background: var(--warn-bg); padding: 6px 10px; border-radius: var(--radius); }
+  .card .actions { display: flex; gap: 8px; }
+  .card .actions .btn { padding: 7px 12px; font-size: 13px; }
+
+  .kanban { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .col { background: var(--muted); border-radius: var(--radius); padding: 8px; min-height: 90px; }
+  .col b { font-size: 12px; display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .mini { background: var(--card); border: 1px solid var(--border); border-radius: calc(var(--radius) - 2px); padding: 6px 8px; font-size: 12px; margin-bottom: 6px; }
+
+  /* Formes et polices : identiques en clair et en sombre */
+  .a { --radius: 8px; --radius-lg: 12px; --font-head: Inter, sans-serif; --font-body: Inter, sans-serif; --font-mono: "IBM Plex Mono", monospace; }
+  .b { --radius: 12px; --radius-lg: 18px; --font-head: Fraunces, Georgia, serif; --font-body: "Source Sans 3", sans-serif; --font-mono: "IBM Plex Mono", monospace; }
+  .c { --radius: 6px; --radius-lg: 8px; --font-head: "IBM Plex Sans", sans-serif; --font-body: "IBM Plex Sans", sans-serif; --font-mono: "IBM Plex Mono", monospace; }
+
+  /* ================= MODE CLAIR ================= */
+  /* A · Net */
+  .a {
+    --bg: #ffffff; --fg: #0f172a; --card: #ffffff; --muted: #f1f5f9; --muted-fg: #64748b;
+    --border: #e2e8f0; --input: #cbd5e1; --ring: #4f46e5;
+    --primary: #4f46e5; --primary-fg: #ffffff; --secondary: #f8fafc; --secondary-fg: #0f172a;
+    --accent: #e0e7ff; --accent-fg: #3730a3; --danger: #dc2626;
+    --badge-bg: #eef2ff; --badge-fg: #4338ca; --warn-bg: #fef3c7; --warn-fg: #92400e;
+    --shadow: 0 1px 2px rgba(15,23,42,.06);
+  }
+  /* B · Chaleureux */
+  .b {
+    --bg: #fbf8f3; --fg: #2b2118; --card: #ffffff; --muted: #f3ece2; --muted-fg: #7a6a5a;
+    --border: #e8dccb; --input: #d9c8b2; --ring: #c2562f;
+    --primary: #c2562f; --primary-fg: #ffffff; --secondary: #f3ece2; --secondary-fg: #2b2118;
+    --accent: #f6dccf; --accent-fg: #8a3517; --danger: #b42318;
+    --badge-bg: #e7f0e4; --badge-fg: #3f6b35; --warn-bg: #fdecc8; --warn-fg: #8a5a00;
+    --shadow: 0 4px 14px rgba(84,52,20,.08);
+  }
+  /* C · Outil */
+  .c {
+    --bg: #f6f8fa; --fg: #1f2328; --card: #ffffff; --muted: #eef1f4; --muted-fg: #59636e;
+    --border: #d1d9e0; --input: #c4ccd5; --ring: #1a7f4b;
+    --primary: #1a7f4b; --primary-fg: #ffffff; --secondary: #eef1f4; --secondary-fg: #1f2328;
+    --accent: #d3f5e2; --accent-fg: #11613a; --danger: #cf222e;
+    --badge-bg: #ddf4ff; --badge-fg: #0a5c8a; --warn-bg: #fff4d4; --warn-fg: #7d4e00;
+    --shadow: none;
+  }
+
+  /* ================= MODE SOMBRE ================= */
+  /* A · Net */
+  [data-theme="dark"] .a {
+    --bg: #0b1020; --fg: #e2e8f0; --card: #111833; --muted: #1a2240; --muted-fg: #94a3b8;
+    --border: #252f52; --input: #334066; --ring: #818cf8;
+    --primary: #818cf8; --primary-fg: #0b1020; --secondary: #1a2240; --secondary-fg: #e2e8f0;
+    --accent: #272f66; --accent-fg: #c7d2fe; --danger: #f87171;
+    --badge-bg: #272f66; --badge-fg: #c7d2fe; --warn-bg: #3b2a07; --warn-fg: #fcd34d;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+  /* B · Chaleureux */
+  [data-theme="dark"] .b {
+    --bg: #1c1612; --fg: #f3e9dc; --card: #261e18; --muted: #2f251d; --muted-fg: #b8a48e;
+    --border: #3d3027; --input: #4d3d31; --ring: #e07a4f;
+    --primary: #e07a4f; --primary-fg: #1c1612; --secondary: #2f251d; --secondary-fg: #f3e9dc;
+    --accent: #4a2a1c; --accent-fg: #f6c4ab; --danger: #f2705f;
+    --badge-bg: #26361f; --badge-fg: #a8d39b; --warn-bg: #3d2d0c; --warn-fg: #f2c46b;
+    --shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  /* C · Outil */
+  [data-theme="dark"] .c {
+    --bg: #0e1116; --fg: #e6edf3; --card: #161b22; --muted: #1c2330; --muted-fg: #8b98a8;
+    --border: #2a3340; --input: #36414f; --ring: #2fbf71;
+    --primary: #2fbf71; --primary-fg: #04170c; --secondary: #1c2330; --secondary-fg: #e6edf3;
+    --accent: #12372a; --accent-fg: #6ee7a8; --danger: #f04f4f;
+    --badge-bg: #0f2e3d; --badge-fg: #7cc7ee; --warn-bg: #3a2c0b; --warn-fg: #f5c451;
+    --shadow: none;
+  }
+
+  /* Fond de la page selon le mode */
+  [data-theme="dark"] body { background: #050608; color: #e4e4e7; }
+  [data-theme="dark"] header.page p { color: #a1a1aa; }
+
+  /* Sélecteur de mode */
+  .toggle { display: inline-flex; gap: 4px; margin-top: 14px; padding: 4px; border-radius: 10px; background: #e4e4e7; }
+  [data-theme="dark"] .toggle { background: #27272a; }
+  .toggle button { font: inherit; font-size: 13px; font-weight: 500; border: 0; padding: 7px 14px; border-radius: 7px; background: transparent; color: inherit; cursor: pointer; }
+  .toggle button[aria-pressed="true"] { background: #ffffff; color: #18181b; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+  [data-theme="dark"] .toggle button[aria-pressed="true"] { background: #3f3f46; color: #fafafa; }
+</style>
+<script>
+  // Mode par défaut = celui du système ; le choix manuel est retenu dans ce navigateur.
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem("ds-theme"); } catch (e) {}
+    var theme = saved || (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+  function setTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem("ds-theme", t); } catch (e) {}
+    document.querySelectorAll(".toggle button").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset.t === t));
+    });
+  }
+  document.addEventListener("DOMContentLoaded", function () {
+    setTheme(document.documentElement.getAttribute("data-theme"));
+  });
+</script>
+</head>
+<body>
+<header class="page">
+  <h1>Pipeline · trois design systems</h1>
+  <p>Même contenu, trois styles. Compare les couleurs, la typographie, les boutons, les champs et la carte de contact, puis choisis A, B ou C. Celui-là deviendra le thème shadcn de l'app. Chaque style existe en clair et en sombre.</p>
+  <div class="toggle" role="group" aria-label="Mode d'affichage">
+    <button type="button" data-t="light" onclick="setTheme('light')">☀️ Clair</button>
+    <button type="button" data-t="dark" onclick="setTheme('dark')">🌙 Sombre</button>
+  </div>
+</header>
+
+<main class="grid">
+<!-- ===================== A ===================== -->
+<section class="ds a">
+  <div><h2>A · Net</h2><span class="tag">Clair, sobre, accent indigo. Inter. Style SaaS classique.</span></div>
+  <div><h3>Couleurs</h3>
+    <div class="swatches">
+      <div class="sw" style="background:var(--primary)"><span>primaire</span></div>
+      <div class="sw" style="background:var(--fg)"><span>texte</span></div>
+      <div class="sw" style="background:var(--muted)"><span>fond doux</span></div>
+      <div class="sw" style="background:var(--border)"><span>bordure</span></div>
+      <div class="sw" style="background:var(--warn-bg)"><span>relance</span></div>
+      <div class="sw" style="background:var(--danger)"><span>danger</span></div>
+    </div><div class="spacer"></div>
+  </div>
+  <div class="type"><h3>Typographie</h3>
+    <div class="t1">Qui relancer aujourd'hui ?</div>
+    <div class="t2">3 contacts attendent une relance. Fais-les avancer d'une étape.</div>
+    <div class="t3">Texte secondaire · Inter 13 px</div>
+    <div class="t4">relance: 2026-11-19</div>
+  </div>
+  <div><h3>Boutons</h3>
+    <div class="row"><button class="btn primary">Ajouter un contact</button><button class="btn secondary">Annuler</button><button class="btn ghost">Plus</button><button class="btn danger">Supprimer</button></div>
+  </div>
+  <div><h3>Champs</h3>
+    <div class="field"><label>Nom</label><input value="Claire Martin"></div>
+    <div class="field"><label>Étape</label><select><option>Contacté</option><option>RDV</option><option>Proposition</option></select></div>
+    <div class="field error"><label>Entreprise</label><input placeholder="Entreprise"><span class="hint">Ce champ est obligatoire.</span></div>
+  </div>
+  <div><h3>Carte de contact</h3>
+    <div class="card">
+      <div class="top"><div class="who"><div class="avatar">CM</div><div><strong>Claire Martin</strong><small>Atelier Lumen</small></div></div><span class="badge">RDV</span></div>
+      <div class="relance">⏰ À relancer aujourd'hui</div>
+      <div class="actions"><button class="btn primary">Étape suivante</button><button class="btn secondary">Modifier</button></div>
+    </div>
+  </div>
+  <div><h3>Aperçu kanban</h3>
+    <div class="kanban">
+      <div class="col"><b>Contacté <span>2</span></b><div class="mini">Paul Durand</div><div class="mini">Inès Roy</div></div>
+      <div class="col"><b>RDV <span>1</span></b><div class="mini">Claire Martin</div></div>
+      <div class="col"><b>Proposition <span>0</span></b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== B ===================== -->
+<section class="ds b">
+  <div><h2>B · Chaleureux</h2><span class="tag">Tons sable et terracotta, coins arrondis. Titres en Fraunces (serif).</span></div>
+  <div><h3>Couleurs</h3>
+    <div class="swatches">
+      <div class="sw" style="background:var(--primary)"><span>primaire</span></div>
+      <div class="sw" style="background:var(--fg)"><span>texte</span></div>
+      <div class="sw" style="background:var(--muted)"><span>fond doux</span></div>
+      <div class="sw" style="background:var(--border)"><span>bordure</span></div>
+      <div class="sw" style="background:var(--warn-bg)"><span>relance</span></div>
+      <div class="sw" style="background:var(--danger)"><span>danger</span></div>
+    </div><div class="spacer"></div>
+  </div>
+  <div class="type"><h3>Typographie</h3>
+    <div class="t1">Qui relancer aujourd'hui ?</div>
+    <div class="t2">3 contacts attendent une relance. Fais-les avancer d'une étape.</div>
+    <div class="t3">Texte secondaire · Source Sans 3 13 px</div>
+    <div class="t4">relance: 2026-11-19</div>
+  </div>
+  <div><h3>Boutons</h3>
+    <div class="row"><button class="btn primary">Ajouter un contact</button><button class="btn secondary">Annuler</button><button class="btn ghost">Plus</button><button class="btn danger">Supprimer</button></div>
+  </div>
+  <div><h3>Champs</h3>
+    <div class="field"><label>Nom</label><input value="Claire Martin"></div>
+    <div class="field"><label>Étape</label><select><option>Contacté</option><option>RDV</option><option>Proposition</option></select></div>
+    <div class="field error"><label>Entreprise</label><input placeholder="Entreprise"><span class="hint">Ce champ est obligatoire.</span></div>
+  </div>
+  <div><h3>Carte de contact</h3>
+    <div class="card">
+      <div class="top"><div class="who"><div class="avatar">CM</div><div><strong>Claire Martin</strong><small>Atelier Lumen</small></div></div><span class="badge">RDV</span></div>
+      <div class="relance">⏰ À relancer aujourd'hui</div>
+      <div class="actions"><button class="btn primary">Étape suivante</button><button class="btn secondary">Modifier</button></div>
+    </div>
+  </div>
+  <div><h3>Aperçu kanban</h3>
+    <div class="kanban">
+      <div class="col"><b>Contacté <span>2</span></b><div class="mini">Paul Durand</div><div class="mini">Inès Roy</div></div>
+      <div class="col"><b>RDV <span>1</span></b><div class="mini">Claire Martin</div></div>
+      <div class="col"><b>Proposition <span>0</span></b></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== C ===================== -->
+<section class="ds c">
+  <div><h2>C · Outil</h2><span class="tag">Accent vert, compact, style outil de dev. IBM Plex Sans et Mono.</span></div>
+  <div><h3>Couleurs</h3>
+    <div class="swatches">
+      <div class="sw" style="background:var(--primary)"><span>primaire</span></div>
+      <div class="sw" style="background:var(--fg)"><span>texte</span></div>
+      <div class="sw" style="background:var(--muted)"><span>fond doux</span></div>
+      <div class="sw" style="background:var(--border)"><span>bordure</span></div>
+      <div class="sw" style="background:var(--warn-bg)"><span>relance</span></div>
+      <div class="sw" style="background:var(--danger)"><span>danger</span></div>
+    </div><div class="spacer"></div>
+  </div>
+  <div class="type"><h3>Typographie</h3>
+    <div class="t1">Qui relancer aujourd'hui ?</div>
+    <div class="t2">3 contacts attendent une relance. Fais-les avancer d'une étape.</div>
+    <div class="t3">Texte secondaire · IBM Plex Sans 13 px</div>
+    <div class="t4">relance: 2026-11-19</div>
+  </div>
+  <div><h3>Boutons</h3>
+    <div class="row"><button class="btn primary">Ajouter un contact</button><button class="btn secondary">Annuler</button><button class="btn ghost">Plus</button><button class="btn danger">Supprimer</button></div>
+  </div>
+  <div><h3>Champs</h3>
+    <div class="field"><label>Nom</label><input value="Claire Martin"></div>
+    <div class="field"><label>Étape</label><select><option>Contacté</option><option>RDV</option><option>Proposition</option></select></div>
+    <div class="field error"><label>Entreprise</label><input placeholder="Entreprise"><span class="hint">Ce champ est obligatoire.</span></div>
+  </div>
+  <div><h3>Carte de contact</h3>
+    <div class="card">
+      <div class="top"><div class="who"><div class="avatar">CM</div><div><strong>Claire Martin</strong><small>Atelier Lumen</small></div></div><span class="badge">RDV</span></div>
+      <div class="relance">⏰ À relancer aujourd'hui</div>
+      <div class="actions"><button class="btn primary">Étape suivante</button><button class="btn secondary">Modifier</button></div>
+    </div>
+  </div>
+  <div><h3>Aperçu kanban</h3>
+    <div class="kanban">
+      <div class="col"><b>Contacté <span>2</span></b><div class="mini">Paul Durand</div><div class="mini">Inès Roy</div></div>
+      <div class="col"><b>RDV <span>1</span></b><div class="mini">Claire Martin</div></div>
+      <div class="col"><b>Proposition <span>0</span></b></div>
+    </div>
+  </div>
+</section>
+</main>
+</body>
+</html>

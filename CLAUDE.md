@@ -20,10 +20,16 @@ Un mini CRM de prospection, construit lot par lot.
 
 ## Architecture
 3 couches, chacune n'appelle que la suivante :
-- Présentation : `src/app/` (pages) et `src/presentation/` (actions). Passe toujours par un service.
+- Présentation : `src/app/` (pages) et `src/presentation/` (actions, composants, providers). Passe toujours par un service.
 - Service : `src/services/`. Règles métier et validation. Reçoit la couche données en paramètre.
 - Données : `src/data/`. Seule couche qui parle à la base.
 Chaque test est à côté du fichier testé (`*.test.ts`).
+
+## Design system
+- Thème C · Outil, défini dans `src/app/globals.css` : `:root` pour le clair, `.dark` pour le sombre. Toute couleur est une variable du thème, jamais une valeur en dur.
+- Chaque écran fonctionne en clair ET en sombre.
+- Composants shadcn dans `src/presentation/components/ui/` (`pnpm dlx shadcn@latest add <composant>`).
+- Polices : IBM Plex Sans (texte), IBM Plex Mono (code, dates).
 
 ## Git
 - On travaille sur dev. Jamais de commit direct sur main.
