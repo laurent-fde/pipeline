@@ -15,8 +15,15 @@ Un mini CRM de prospection, construit lot par lot.
 - `pnpm test` : lancer les tests (Vitest)
 
 ## Stack
-- Next.js 16 (App Router, dossier `app/`), React 19, TypeScript, Tailwind CSS 4.
+- Next.js 16 (App Router, dossier `src/app/`), React 19, TypeScript, Tailwind CSS 4.
 - Gestionnaire de paquets : pnpm.
+
+## Architecture
+3 couches, chacune n'appelle que la suivante :
+- Présentation : `src/app/` (pages) et `src/presentation/` (actions). Passe toujours par un service.
+- Service : `src/services/`. Règles métier et validation. Reçoit la couche données en paramètre.
+- Données : `src/data/`. Seule couche qui parle à la base.
+Chaque test est à côté du fichier testé (`*.test.ts`).
 
 ## Git
 - On travaille sur dev. Jamais de commit direct sur main.
