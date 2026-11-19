@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 const listExamples = vi.fn(async () => [{ id: "1", name: "Exemple" }]);
 
 vi.mock("@/services/example.service", () => ({
-  createExampleService: () => ({ listExamples }),
+  getExampleService: () => ({ listExamples }),
 }));
 
 import { listExamplesAction } from "./example.action";

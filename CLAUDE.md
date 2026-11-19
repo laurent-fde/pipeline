@@ -6,12 +6,13 @@ Un mini CRM de prospection, construit lot par lot.
 
 ## Avant tout travail
 - Lis INTENT.md avant tout travail.
+- Lis les règles du projet dans .claude/rules/ (une par couche).
 
 ## Commandes
 - `pnpm dev` : lancer l'app en local
 - `pnpm build` : construire l'app
 - `pnpm start` : lancer l'app construite
-- `pnpm lint` : vérifier le code avec ESLint
+- `pnpm lint` : vérifier le code avec ESLint (bloque aussi les imports interdits entre couches)
 - `pnpm test` : lancer les tests (Vitest)
 
 ## Stack
