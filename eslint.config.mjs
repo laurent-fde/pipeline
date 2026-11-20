@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": ["error", { patterns: [
         { group: ["@/data/*"], message: "Présentation : passe par un service, jamais par @/data." },
+        { group: ["@libsql/*"], message: "Seule la couche données parle à la base." },
       ] }],
     },
   },
@@ -19,6 +20,7 @@ const eslintConfig = defineConfig([
     rules: {
       "no-restricted-imports": ["error", { patterns: [
         { group: ["@/presentation/*", "react", "react-dom", "next", "next/*"], message: "Service : ne dépend pas de l'interface." },
+        { group: ["@libsql/*"], message: "Seule la couche données parle à la base." },
       ] }],
     },
   },
