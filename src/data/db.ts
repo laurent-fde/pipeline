@@ -39,9 +39,10 @@ const globalForDb = globalThis as unknown as { pipelineDb?: Database };
 
 export function getDatabase(): Database {
   if (!globalForDb.pipelineDb) {
-    const url = process.env.DATABASE_URL ?? LOCAL_URL;
+    // || et non ?? : une DATABASE_URL vide (copiée de .env.example) retombe sur la base locale.
+    const url = process.env.DATABASE_URL || LOCAL_URL;
     if (url === LOCAL_URL) mkdirSync(LOCAL_DIR, { recursive: true });
-    globalForDb.pipelineDb = openDatabase(url, process.env.DATABASE_AUTH_TOKEN);
+    globalForDb.pipelineDb = openDatabase(url, process.env.DATABASE_AUTH_TOKEN || undefined);
   }
   return globalForDb.pipelineDb;
 }

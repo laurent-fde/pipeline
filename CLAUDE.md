@@ -39,4 +39,5 @@ Chaque test est à côté du fichier testé (`*.test.ts`).
 
 ## Secrets
 - Les valeurs vont dans .env.local, ignoré par Git (.gitignore exclut .env*).
+- .env.example (versionné) liste les variables sans valeur : toute nouvelle variable y est ajoutée.
 - Ne lis jamais .env ni .env.local.
