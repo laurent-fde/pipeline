@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2 } from "lucide-react";
 import { useActionState } from "react";
 import type { ContactFormState } from "@/presentation/actions/contact.action";
 import { Button } from "@/presentation/components/ui/button";
@@ -63,7 +64,8 @@ export function ContactForm({ action }: ContactFormProps) {
       )}
       <div className="sm:col-span-2">
         <Button type="submit" disabled={pending}>
-          Ajouter le contact
+          {pending && <Loader2 aria-hidden className="animate-spin" />}
+          {pending ? "Ajout en cours…" : "Ajouter le contact"}
         </Button>
       </div>
     </form>
