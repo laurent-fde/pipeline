@@ -5,6 +5,7 @@ import { getContactService, type ContactErrors, type ContactInput } from "@/serv
 
 export type ContactFormState = {
   errors?: ContactErrors;
+  formError?: string;
   values?: ContactInput;
 };
 
@@ -17,7 +18,14 @@ export async function addContactAction(_prev: ContactFormState, formData: FormDa
     if (typeof value === "string") values[field] = value;
   }
 
-  const result = await getContactService().addContact(values);
+  let result;
+  try {
+    result = await getContactService().addContact(values);
+  } catch (error) {
+    // Panne de la base (SQLite, Turso) : on la journalise côté serveur, l'utilisateur garde sa saisie.
+    console.error("addContactAction", error);
+    return { formError: "Impossible d'enregistrer le contact, réessaie.", values };
+  }
   if (!result.ok) return { errors: result.errors, values };
 
   refresh();

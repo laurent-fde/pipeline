@@ -56,6 +56,11 @@ export function ContactForm({ action }: ContactFormProps) {
       <Field name="company" label="Entreprise" autoComplete="organization" state={state} />
       <Field name="email" label="E-mail" type="email" autoComplete="email" state={state} />
       <Field name="phone" label="Téléphone" type="tel" autoComplete="tel" state={state} />
+      {state.formError && (
+        <p role="alert" className="text-sm text-destructive sm:col-span-2">
+          {state.formError}
+        </p>
+      )}
       <div className="sm:col-span-2">
         <Button type="submit" disabled={pending}>
           Ajouter le contact

@@ -48,4 +48,17 @@ describe("couche présentation · ContactForm", () => {
     expect(champ.value).toBe("pas-un-mail");
     expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Claire");
   });
+
+  it("annonce l'échec d'enregistrement et garde la saisie", async () => {
+    renderWithResponse({
+      formError: "Impossible d'enregistrer le contact, réessaie.",
+      values: { name: "Claire" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter le contact" }));
+
+    const alerte = await screen.findByRole("alert");
+    expect(alerte.textContent).toBe("Impossible d'enregistrer le contact, réessaie.");
+    expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Claire");
+  });
 });

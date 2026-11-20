@@ -47,4 +47,19 @@ describe("couche présentation · contact.action", () => {
     expect(state).toEqual({ errors, values: invalide });
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  // Panne de la base : un message exploitable, la saisie gardée, pas de page d'erreur.
+  it("renvoie un message et la saisie quand l'enregistrement échoue", async () => {
+    addContact.mockRejectedValue(new Error("SQLITE_BUSY"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const state = await addContactAction({}, formData(saisie));
+
+    expect(state).toEqual({
+      formError: "Impossible d'enregistrer le contact, réessaie.",
+      values: saisie,
+    });
+    expect(refresh).not.toHaveBeenCalled();
+    expect(console.error).toHaveBeenCalled();
+  });
 });
