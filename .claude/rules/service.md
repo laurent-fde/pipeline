@@ -13,9 +13,13 @@ Règles métier et validation (`src/services/`).
 - Tests écrits AVANT le code : un test rouge, puis le code qui le fait passer. Les tests utilisent une fausse couche données, jamais une vraie base.
 
 - Une saisie refusée n'est pas une panne : renvoyer `{ ok: false, errors }`, et non lever une exception.
+- Toute saisie reçue est validée par un schéma Zod (`zod`), avec `safeParse` (jamais `parse`, qui lève une exception). Les erreurs sont mises à plat par champ avec `z.flattenError`. Le type d'entrée reste écrit à la main, tous champs facultatifs : c'est le schéma qui décide.
 
-✅ `if (!name) errors.name = "Le nom est obligatoire"` dans le service, puis `return { ok: false, errors }`
+✅ Le nom vérifié par le schéma du service (« Le nom est obligatoire »), puis `return { ok: false, errors }`
 ❌ Le nom vérifié seulement par `required` dans le formulaire
+
+✅ `contactSchema.safeParse(input)` puis `z.flattenError(result.error).fieldErrors`
+❌ Des `if` écrits à la main pour valider, ou `contactSchema.parse(input)`
 
 ## Comment vérifier
 - `pnpm lint` passe : il refuse tout import de React, `next/*` ou `@/presentation` ici.
