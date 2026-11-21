@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ContactFormState } from "@/presentation/actions/contact.action";
 import { ContactForm } from "./contact-form";
@@ -47,6 +47,22 @@ describe("couche présentation · ContactForm", () => {
     expect(champ.getAttribute("aria-describedby")).toBe(message.id);
     expect(champ.value).toBe("pas-un-mail");
     expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Claire");
+  });
+
+  it("affiche « Ajout en cours… » pendant l'envoi, puis revient au libellé normal", async () => {
+    let terminer!: (state: ContactFormState) => void;
+    const action = vi.fn(() => new Promise<ContactFormState>((resolve) => (terminer = resolve)));
+    render(<ContactForm action={action} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter le contact" }));
+
+    const enCours = await screen.findByRole("button", { name: "Ajout en cours…" });
+    expect((enCours as HTMLButtonElement).disabled).toBe(true);
+
+    await act(async () => terminer({}));
+
+    const bouton = await screen.findByRole("button", { name: "Ajouter le contact" });
+    expect((bouton as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("annonce l'échec d'enregistrement et garde la saisie", async () => {
