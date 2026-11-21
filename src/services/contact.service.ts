@@ -5,28 +5,21 @@ import {
   type NewContact,
 } from "@/data/contact.repository";
 import { z } from "zod";
+import { allowedMoves, FIRST_STAGE, MOVES, STAGES, targetStage, type AllowedMoves, type Move, type Stage } from "./stages";
 
 export type { Contact };
 
-// Les étapes du pipeline, dans l'ordre du tableau. « Perdu » est atteignable depuis n'importe quelle étape.
-export const STAGES = [
-  { id: "nouveau", label: "Nouveau" },
-  { id: "contacte", label: "Contacté" },
-  { id: "rdv", label: "RDV" },
-  { id: "proposition", label: "Proposition" },
-  { id: "gagne", label: "Gagné" },
-  { id: "perdu", label: "Perdu" },
-] as const;
+export { STAGES, type Move, type Stage } from "./stages";
 
-export type Stage = (typeof STAGES)[number]["id"];
-
-const FIRST_STAGE: Stage = "nouveau";
-
-export type BoardColumn = { stage: Stage; label: string; count: number; contacts: Contact[] };
+export type BoardColumn = { stage: Stage; label: string; count: number; contacts: Contact[]; moves: AllowedMoves };
 
 export type Board = { columns: BoardColumn[]; total: number };
 
 export type ContactErrors = { name?: string; email?: string };
+
+export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: string };
+
+const moveSchema = z.enum(MOVES);
 
 export type AddContactResult = { ok: true; contact: Contact } | { ok: false; errors: ContactErrors };
 
@@ -76,9 +69,24 @@ export function createContactService(repository: ContactRepository) {
       const contacts = await repository.findAll();
       const columns = STAGES.map(({ id, label }) => {
         const inColumn = contacts.filter((contact) => contact.stage === id);
-        return { stage: id, label, count: inColumn.length, contacts: inColumn };
+        return { stage: id, label, count: inColumn.length, contacts: inColumn, moves: allowedMoves(id) };
       });
       return { columns, total: contacts.length };
+    },
+
+    // Étape suivante, précédente ou Perdu : la règle décide, la couche données enregistre.
+    async moveContact(id: string, move: Move): Promise<MoveResult> {
+      const parsedMove = moveSchema.safeParse(move);
+      if (!parsedMove.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: "Contact introuvable" };
+
+      const stage = targetStage(contact.stage, parsedMove.data);
+      if (!stage) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const moved = await repository.updateStage(id, stage);
+      return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
     },
   };
 }

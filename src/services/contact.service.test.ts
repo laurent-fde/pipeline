@@ -1,21 +1,8 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
-import type { Contact, ContactRepository, NewContact } from "@/data/contact.repository";
+import { describe, expect, it } from "vitest";
+import type { Contact } from "@/data/contact.repository";
 import { createContactService, STAGES } from "./contact.service";
-
-// Fausse couche données : un tableau en mémoire, jamais une vraie base.
-function fakeRepository(initial: Contact[] = []) {
-  const contacts: Contact[] = [...initial];
-  const repository: ContactRepository = {
-    insert: vi.fn(async (input: NewContact) => {
-      const contact = { ...input, id: String(contacts.length + 1), createdAt: "2026-11-20T10:00:00.000Z" };
-      contacts.unshift(contact);
-      return contact;
-    }),
-    findAll: vi.fn(async () => [...contacts]),
-  };
-  return repository;
-}
+import { aContact, fakeContactRepository as fakeRepository } from "./testing/fake-contact-repository";
 
 describe("couche service · contact.service", () => {
   // Critère 1 : je saisis un nom et je valide, le contact apparaît avec ses informations.
@@ -149,5 +136,94 @@ describe("couche service · contact.service · tableau kanban (lot 2)", () => {
 
     expect(board.total).toBe(0);
     expect(board.columns.every((c) => c.count === 0)).toBe(true);
+  });
+});
+
+describe("couche service · contact.service · déplacer un contact (lot 3)", () => {
+  const serviceWith = (stage: string) => {
+    const repository = fakeRepository([aContact({ id: "1", stage })]);
+    return { repository, service: createContactService(repository) };
+  };
+
+  // Critère 1 : « Étape suivante » fait passer le contact dans la colonne suivante.
+  it.each([
+    ["nouveau", "contacte"],
+    ["contacte", "rdv"],
+    ["rdv", "proposition"],
+    ["proposition", "gagne"],
+  ])("fait passer un contact de %s à %s", async (from, to) => {
+    const { repository, service } = serviceWith(from);
+
+    const result = await service.moveContact("1", "next");
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
+    expect(repository.updateStage).toHaveBeenCalledWith("1", to);
+  });
+
+  // Critère 2 : « Étape précédente » ramène le contact dans la colonne précédente.
+  it.each([
+    ["contacte", "nouveau"],
+    ["rdv", "contacte"],
+    ["proposition", "rdv"],
+    ["gagne", "proposition"],
+    ["perdu", "gagne"],
+  ])("ramène un contact de %s à %s", async (from, to) => {
+    const { service } = serviceWith(from);
+
+    const result = await service.moveContact("1", "previous");
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
+  });
+
+  it("refuse « Étape précédente » depuis Nouveau, sans rien enregistrer", async () => {
+    const { repository, service } = serviceWith("nouveau");
+
+    const result = await service.moveContact("1", "previous");
+
+    expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
+    expect(repository.updateStage).not.toHaveBeenCalled();
+  });
+
+  // Critère 3 : « Marquer perdu » fait passer le contact dans Perdu, depuis n'importe quelle étape.
+  it.each(["nouveau", "contacte", "rdv", "proposition", "gagne"])("marque perdu un contact à l'étape %s", async (from) => {
+    const { service } = serviceWith(from);
+
+    const result = await service.moveContact("1", "lost");
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: "perdu" }) });
+  });
+
+  // Critère 4 : depuis Gagné ou Perdu, « Étape suivante » est indisponible.
+  it.each(["gagne", "perdu"])("refuse « Étape suivante » depuis %s, sans rien enregistrer", async (from) => {
+    const { repository, service } = serviceWith(from);
+
+    const result = await service.moveContact("1", "next");
+
+    expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
+    expect(repository.updateStage).not.toHaveBeenCalled();
+  });
+
+  it("indique dans le tableau les déplacements permis pour chaque colonne", async () => {
+    const board = await createContactService(fakeRepository()).getBoard();
+
+    expect(Object.fromEntries(board.columns.map((c) => [c.stage, c.moves]))).toEqual({
+      nouveau: { previous: false, next: true, lost: true },
+      contacte: { previous: true, next: true, lost: true },
+      rdv: { previous: true, next: true, lost: true },
+      proposition: { previous: true, next: true, lost: true },
+      gagne: { previous: true, next: false, lost: true },
+      perdu: { previous: true, next: false, lost: false },
+    });
+  });
+
+  it("refuse un contact inconnu ou un déplacement inconnu", async () => {
+    const { repository, service } = serviceWith("rdv");
+
+    expect(await service.moveContact("inconnu", "next")).toEqual({ ok: false, error: "Contact introuvable" });
+    expect(await service.moveContact("1", "sauter" as never)).toEqual({
+      ok: false,
+      error: "Ce déplacement n'est pas possible",
+    });
+    expect(repository.updateStage).not.toHaveBeenCalled();
   });
 });

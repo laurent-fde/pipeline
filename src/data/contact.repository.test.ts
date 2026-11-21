@@ -101,4 +101,37 @@ describe("couche données · contact.repository", () => {
     const repository = createContactRepository(open(url));
     expect(await repository.findAll()).toEqual([expect.objectContaining({ name: "Claire Martin", stage: "nouveau" })]);
   });
+
+  // Lot 3 · Critères 1 à 3 : l'étape enregistrée change, sans décision ici.
+  it("change l'étape d'un contact et le renvoie", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+
+    const moved = await repository.updateStage(saved.id, "rdv");
+
+    expect(moved).toEqual({ ...saved, stage: "rdv" });
+    expect(await repository.findById(saved.id)).toEqual({ ...saved, stage: "rdv" });
+  });
+
+  it("renvoie null pour un contact inconnu", async () => {
+    const repository = createContactRepository(open(":memory:"));
+
+    expect(await repository.findById("inconnu")).toBeNull();
+    expect(await repository.updateStage("inconnu", "rdv")).toBeNull();
+  });
+
+  // Lot 3 · Critère 5 : un contact déplacé est toujours dans sa nouvelle colonne après redémarrage.
+  it("garde la nouvelle étape après un redémarrage", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pipeline-"));
+    tempDirs.push(dir);
+    const url = `file:${join(dir, "pipeline.db")}`;
+
+    const avant = open(url);
+    const saved = await createContactRepository(avant).insert(claire);
+    await createContactRepository(avant).updateStage(saved.id, "proposition");
+    avant.client.close();
+
+    expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ stage: "proposition" });
+  });
 });
+

@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Board, Contact } from "@/services/contact.service";
 import { KanbanBoard } from "./kanban-board";
 
@@ -27,7 +27,8 @@ const contact = (id: string, name: string, stage: string): Contact => ({
 function board(contacts: Contact[]): Board {
   const columns = LABELS.map(([stage, label]) => {
     const inColumn = contacts.filter((c) => c.stage === stage);
-    return { stage, label, count: inColumn.length, contacts: inColumn };
+    const moves = { previous: stage !== "nouveau", next: stage !== "gagne" && stage !== "perdu", lost: stage !== "perdu" };
+    return { stage, label, count: inColumn.length, contacts: inColumn, moves };
   });
   return { columns, total: contacts.length };
 }
@@ -90,4 +91,20 @@ describe("couche présentation · KanbanBoard", () => {
 
     expect(screen.queryByText(/ajoute ton premier contact/i)).toBeNull();
   });
+
+  // Lot 3 · Critère 4 : sur la carte d'un contact Gagné, « Étape suivante » est indisponible.
+  it("affiche les boutons d'étape sur chaque carte, selon les déplacements permis de la colonne", () => {
+    render(
+      <KanbanBoard
+        board={board([contact("1", "Claire Martin", "nouveau"), contact("2", "Paul Durand", "gagne")])}
+        moveAction={vi.fn()}
+      />,
+    );
+
+    const suivante = (label: string) =>
+      within(column(label)).getByRole("button", { name: "Étape suivante" }) as HTMLButtonElement;
+    expect(suivante("Nouveau").disabled).toBe(false);
+    expect(suivante("Gagné").disabled).toBe(true);
+  });
 });
+

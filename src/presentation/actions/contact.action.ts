@@ -1,7 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { getContactService, type ContactErrors, type ContactInput } from "@/services/contact.service";
+import { getContactService, type ContactErrors, type ContactInput, type Move } from "@/services/contact.service";
 
 export type ContactFormState = {
   errors?: ContactErrors;
@@ -27,6 +27,22 @@ export async function addContactAction(_prev: ContactFormState, formData: FormDa
     return { formError: "Impossible d'enregistrer le contact, réessaie.", values };
   }
   if (!result.ok) return { errors: result.errors, values };
+
+  refresh();
+  return {};
+}
+
+export type MoveState = { error?: string };
+
+export async function moveContactAction(id: string, move: Move): Promise<MoveState> {
+  let result;
+  try {
+    result = await getContactService().moveContact(id, move);
+  } catch (error) {
+    console.error("moveContactAction", error);
+    return { error: "Impossible de déplacer le contact, réessaie." };
+  }
+  if (!result.ok) return { error: result.error };
 
   refresh();
   return {};

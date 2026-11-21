@@ -15,6 +15,8 @@ export type NewContact = Omit<Contact, "id" | "createdAt">;
 export interface ContactRepository {
   insert(contact: NewContact): Promise<Contact>;
   findAll(): Promise<Contact[]>;
+  findById(id: string): Promise<Contact | null>;
+  updateStage(id: string, stage: string): Promise<Contact | null>;
 }
 
 type ContactRow = {
@@ -37,6 +39,8 @@ const toContact = (row: ContactRow): Contact => ({
   createdAt: row.created_at,
 });
 
+const COLUMNS = "id, name, company, email, phone, stage, created_at";
+
 export function createContactRepository(db: Database = getDatabase()): ContactRepository {
   return {
     async insert(input) {
@@ -53,9 +57,26 @@ export function createContactRepository(db: Database = getDatabase()): ContactRe
       await db.ready;
       // rowid départage deux contacts créés dans la même milliseconde.
       const { rows } = await db.client.execute(
-        "SELECT id, name, company, email, phone, stage, created_at FROM contacts ORDER BY created_at DESC, rowid DESC",
+        `SELECT ${COLUMNS} FROM contacts ORDER BY created_at DESC, rowid DESC`,
       );
       return (rows as unknown as ContactRow[]).map(toContact);
+    },
+
+    async findById(id) {
+      await db.ready;
+      const { rows } = await db.client.execute({ sql: `SELECT ${COLUMNS} FROM contacts WHERE id = ?`, args: [id] });
+      const row = rows[0] as unknown as ContactRow | undefined;
+      return row ? toContact(row) : null;
+    },
+
+    async updateStage(id, stage) {
+      await db.ready;
+      const { rows } = await db.client.execute({
+        sql: `UPDATE contacts SET stage = ? WHERE id = ? RETURNING ${COLUMNS}`,
+        args: [stage, id],
+      });
+      const row = rows[0] as unknown as ContactRow | undefined;
+      return row ? toContact(row) : null;
     },
   };
 }

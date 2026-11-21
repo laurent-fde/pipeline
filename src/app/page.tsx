@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { getContactService } from "@/services/contact.service";
-import { addContactAction } from "@/presentation/actions/contact.action";
+import { addContactAction, moveContactAction } from "@/presentation/actions/contact.action";
 import { ContactForm } from "@/presentation/components/contact-form";
 import { KanbanBoard } from "@/presentation/components/kanban-board";
 import { ThemeToggle } from "@/presentation/components/theme-toggle";
@@ -10,7 +10,7 @@ import { ThemeToggle } from "@/presentation/components/theme-toggle";
 async function Board() {
   await connection();
   const board = await getContactService().getBoard();
-  return <KanbanBoard board={board} />;
+  return <KanbanBoard board={board} moveAction={moveContactAction} />;
 }
 
 export default function Home() {

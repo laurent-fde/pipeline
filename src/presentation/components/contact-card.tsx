@@ -1,4 +1,5 @@
 import type { Contact } from "@/services/contact.service";
+import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/presentation/components/ui/card";
 
 const initials = (name: string) =>
@@ -8,7 +9,8 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ContactCard({ contact }: { contact: Contact }) {
+// children : les actions posées sous la carte (étape, relance…).
+export function ContactCard({ contact, children }: { contact: Contact; children?: ReactNode }) {
   return (
     <Card size="sm">
       <CardHeader className="flex items-center gap-3">
@@ -32,6 +34,7 @@ export function ContactCard({ contact }: { contact: Contact }) {
           {contact.phone && <span>{contact.phone}</span>}
         </CardContent>
       )}
+      {children && <CardContent className="grid gap-2">{children}</CardContent>}
     </Card>
   );
 }

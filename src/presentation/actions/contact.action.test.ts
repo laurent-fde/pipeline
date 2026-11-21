@@ -2,14 +2,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted : les simulations doivent exister avant les vi.mock, remontés en haut du fichier.
-const { addContact, refresh } = vi.hoisted(() => ({ addContact: vi.fn(), refresh: vi.fn() }));
+const { addContact, moveContact, refresh } = vi.hoisted(() => ({
+  addContact: vi.fn(),
+  moveContact: vi.fn(),
+  refresh: vi.fn(),
+}));
 
 vi.mock("@/services/contact.service", () => ({
-  getContactService: () => ({ addContact }),
+  getContactService: () => ({ addContact, moveContact }),
 }));
 vi.mock("next/cache", () => ({ refresh }));
 
-import { addContactAction } from "./contact.action";
+import { addContactAction, moveContactAction } from "./contact.action";
 
 function formData(values: Record<string, string>) {
   const data = new FormData();
@@ -63,3 +67,35 @@ describe("couche présentation · contact.action", () => {
     expect(console.error).toHaveBeenCalled();
   });
 });
+
+describe("couche présentation · moveContactAction (lot 3)", () => {
+  beforeEach(() => {
+    moveContact.mockReset();
+    refresh.mockReset();
+  });
+
+  // Critères 1 à 3 : le déplacement passe par le service, puis la page est rafraîchie.
+  it("passe le déplacement au service et rafraîchit la page quand il réussit", async () => {
+    moveContact.mockResolvedValue({ ok: true, contact: { id: "1", stage: "contacte" } });
+
+    expect(await moveContactAction("1", "next")).toEqual({});
+    expect(moveContact).toHaveBeenCalledWith("1", "next");
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("renvoie l'erreur du service sans rafraîchir", async () => {
+    moveContact.mockResolvedValue({ ok: false, error: "Ce déplacement n'est pas possible" });
+
+    expect(await moveContactAction("1", "next")).toEqual({ error: "Ce déplacement n'est pas possible" });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("renvoie un message quand la base est en panne", async () => {
+    moveContact.mockRejectedValue(new Error("SQLITE_BUSY"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await moveContactAction("1", "next")).toEqual({ error: "Impossible de déplacer le contact, réessaie." });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
