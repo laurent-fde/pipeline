@@ -2,11 +2,18 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createClient } from "@libsql/client";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase, type Database } from "./db";
 import { createContactRepository } from "./contact.repository";
 
-const claire = { name: "Claire Martin", company: "Atelier Lumen", email: "claire@lumen.fr", phone: "06 12 34 56 78" };
+const claire = {
+  name: "Claire Martin",
+  company: "Atelier Lumen",
+  email: "claire@lumen.fr",
+  phone: "06 12 34 56 78",
+  stage: "nouveau",
+};
 
 describe("couche données · contact.repository", () => {
   const opened: Database[] = [];
@@ -45,7 +52,7 @@ describe("couche données · contact.repository", () => {
   it("garde les champs facultatifs vides", async () => {
     const repository = createContactRepository(open(":memory:"));
 
-    const saved = await repository.insert({ name: "Sans détails", company: null, email: null, phone: null });
+    const saved = await repository.insert({ name: "Sans détails", company: null, email: null, phone: null, stage: "nouveau" });
 
     expect(saved).toMatchObject({ company: null, email: null, phone: null });
   });
@@ -62,5 +69,36 @@ describe("couche données · contact.repository", () => {
 
     const apres = createContactRepository(open(url));
     expect(await apres.findAll()).toEqual([expect.objectContaining(claire)]);
+  });
+
+  // Lot 2 · Critère 2 : l'étape est enregistrée et relue telle quelle, sans décision ici.
+  it("enregistre l'étape reçue et la renvoie", async () => {
+    const repository = createContactRepository(open(":memory:"));
+
+    const saved = await repository.insert({ ...claire, stage: "rdv" });
+
+    expect(saved.stage).toBe("rdv");
+    expect(await repository.findAll()).toEqual([expect.objectContaining({ stage: "rdv" })]);
+  });
+
+  // Lot 2 · Critère 2 : les contacts du lot 1 (base sans étape) arrivent dans Nouveau après migration.
+  it("range dans « nouveau » les contacts d'une base créée avant les étapes", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pipeline-"));
+    tempDirs.push(dir);
+    const url = `file:${join(dir, "pipeline.db")}`;
+
+    const ancienne = createClient({ url });
+    await ancienne.batch(
+      [
+        "CREATE TABLE contacts (id TEXT PRIMARY KEY, name TEXT NOT NULL, company TEXT, email TEXT, phone TEXT, created_at TEXT NOT NULL)",
+        "PRAGMA user_version = 1",
+        "INSERT INTO contacts (id, name, created_at) VALUES ('1', 'Claire Martin', '2026-11-20T10:00:00.000Z')",
+      ],
+      "write",
+    );
+    ancienne.close();
+
+    const repository = createContactRepository(open(url));
+    expect(await repository.findAll()).toEqual([expect.objectContaining({ name: "Claire Martin", stage: "nouveau" })]);
   });
 });
