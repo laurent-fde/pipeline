@@ -134,17 +134,31 @@ describe("couche données · contact.repository", () => {
     expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ stage: "proposition" });
   });
 
-  // Lot 4 · Critère 1 : la date de relance est enregistrée et relue.
-  it("enregistre la date de relance, absente par défaut", async () => {
+  // Lot 4 · Critère 1 et lot 5 : la date de relance et l'attente de réponse sont enregistrées et relues.
+  it("enregistre la relance et l'attente de réponse, absentes par défaut", async () => {
     const repository = createContactRepository(open(":memory:"));
     const saved = await repository.insert(claire);
-    expect(saved.followUpOn).toBeNull();
+    expect(saved).toMatchObject({ followUpOn: null, awaitingReply: false });
 
-    const updated = await repository.setFollowUp(saved.id, "2026-11-21");
+    const updated = await repository.updateFollowUp(saved.id, { date: "2026-11-21", awaitingReply: true });
 
-    expect(updated).toEqual({ ...saved, followUpOn: "2026-11-21" });
-    expect(await repository.findAll()).toEqual([{ ...saved, followUpOn: "2026-11-21" }]);
-    expect(await repository.setFollowUp("inconnu", "2026-11-21")).toBeNull();
+    expect(updated).toEqual({ ...saved, followUpOn: "2026-11-21", awaitingReply: true });
+    expect(await repository.findAll()).toEqual([{ ...saved, followUpOn: "2026-11-21", awaitingReply: true }]);
+    expect(await repository.updateFollowUp("inconnu", { date: null, awaitingReply: false })).toBeNull();
+  });
+
+  // Lot 5 · Critère 4 : un contact en attente de réponse le reste après redémarrage.
+  it("garde l'attente de réponse après un redémarrage", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pipeline-"));
+    tempDirs.push(dir);
+    const url = `file:${join(dir, "pipeline.db")}`;
+
+    const avant = open(url);
+    const saved = await createContactRepository(avant).insert(claire);
+    await createContactRepository(avant).updateFollowUp(saved.id, { date: "2026-11-21", awaitingReply: true });
+    avant.client.close();
+
+    expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ awaitingReply: true });
   });
 });
 

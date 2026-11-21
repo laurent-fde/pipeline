@@ -22,6 +22,7 @@ const contact = (id: string, name: string, stage: string): Contact => ({
   phone: null,
   stage,
   followUpOn: null,
+  awaitingReply: false,
   createdAt: "2026-11-20T10:00:00.000Z",
 });
 

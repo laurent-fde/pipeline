@@ -104,16 +104,30 @@ export function createContactService(repository: ContactRepository, now: () => D
       const parsed = followUpSchema.safeParse(input);
       if (!parsed.success) return { ok: false, error: "La date n'est pas valide" };
 
-      const contact = await repository.setFollowUp(id, parsed.data.date);
+      // Une nouvelle date remplace l'ancienne et met fin à l'attente de réponse.
+      const contact = await repository.updateFollowUp(id, { date: parsed.data.date, awaitingReply: false });
       return contact ? { ok: true, contact } : { ok: false, error: "Contact introuvable" };
     },
 
-    // Relances dues aujourd'hui ou en retard, de la plus ancienne à la plus récente.
+    // Relance faite : le contact attend une réponse, garde sa date et reste dans sa colonne.
+    async markFollowUpDone(id: string): Promise<FollowUpResult> {
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: "Contact introuvable" };
+      if (!contact.followUpOn) return { ok: false, error: "Aucune relance à marquer comme faite" };
+
+      const updated = await repository.updateFollowUp(id, { date: contact.followUpOn, awaitingReply: true });
+      return updated ? { ok: true, contact: updated } : { ok: false, error: "Contact introuvable" };
+    },
+
+    // Relances dues aujourd'hui ou en retard, de la plus ancienne à la plus récente (hors attente de réponse).
     async getFollowUps(): Promise<FollowUp[]> {
       const today = parisToday(now());
       const contacts = await repository.findAll();
       return contacts
-        .filter((contact): contact is Contact & { followUpOn: string } => !!contact.followUpOn && contact.followUpOn <= today)
+        .filter(
+          (contact): contact is Contact & { followUpOn: string } =>
+            !contact.awaitingReply && !!contact.followUpOn && contact.followUpOn <= today,
+        )
         .sort((a, b) => a.followUpOn.localeCompare(b.followUpOn))
         .map((contact) => ({ contact, overdue: contact.followUpOn < today }));
     },

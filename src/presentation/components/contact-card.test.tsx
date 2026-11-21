@@ -12,6 +12,7 @@ const claire = {
   phone: "06 12 34 56 78",
   stage: "nouveau",
   followUpOn: null,
+  awaitingReply: false,
   createdAt: "2026-11-20T10:00:00.000Z",
 };
 
@@ -33,4 +34,14 @@ describe("couche présentation · ContactCard", () => {
     expect(screen.queryByText("Atelier Lumen")).toBeNull();
     expect(screen.queryByText("claire@lumen.fr")).toBeNull();
   });
+
+  // Lot 5 · Critère 2 : une relance faite affiche le badge « En attente de réponse ».
+  it("affiche « En attente de réponse » quand la relance est faite, et seulement alors", () => {
+    const { rerender } = render(<ContactCard contact={{ ...claire, awaitingReply: true }} />);
+    expect(screen.getByText("En attente de réponse")).toBeDefined();
+
+    rerender(<ContactCard contact={claire} />);
+    expect(screen.queryByText("En attente de réponse")).toBeNull();
+  });
 });
+

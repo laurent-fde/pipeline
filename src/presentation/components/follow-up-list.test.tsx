@@ -1,5 +1,5 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Contact } from "@/services/contact.service";
 import { FollowUpList } from "./follow-up-list";
 
@@ -13,6 +13,7 @@ const contact = (id: string, name: string, followUpOn: string): Contact => ({
   phone: null,
   stage: "rdv",
   followUpOn,
+  awaitingReply: false,
   createdAt: "2026-11-20T10:00:00.000Z",
 });
 
@@ -41,4 +42,34 @@ describe("couche présentation · FollowUpList (lot 4)", () => {
     expect(screen.getByText("Personne à relancer aujourd'hui")).toBeDefined();
     expect(screen.queryByRole("list")).toBeNull();
   });
+
+  // Lot 5 · Critère 1 : « Relance faite » envoie le contact concerné.
+  it("propose « Relance faite » pour chaque contact et envoie son identifiant", async () => {
+    const doneAction = vi.fn(async () => ({}));
+    render(
+      <FollowUpList
+        followUps={[{ contact: contact("7", "Claire Martin", "2026-11-21"), overdue: false }]}
+        doneAction={doneAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Relance faite pour Claire Martin" }));
+
+    await vi.waitFor(() => expect(doneAction).toHaveBeenCalledWith("7"));
+  });
+
+  it("annonce l'erreur renvoyée par l'action", async () => {
+    const doneAction = vi.fn(async () => ({ error: "Impossible d'enregistrer la relance, réessaie." }));
+    render(
+      <FollowUpList
+        followUps={[{ contact: contact("7", "Claire Martin", "2026-11-21"), overdue: false }]}
+        doneAction={doneAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Relance faite pour Claire Martin" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Impossible d'enregistrer la relance, réessaie.");
+  });
 });
+

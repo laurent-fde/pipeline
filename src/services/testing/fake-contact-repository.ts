@@ -12,6 +12,7 @@ export function fakeContactRepository(initial: Contact[] = []) {
         ...input,
         id: String(contacts.length + 1),
         followUpOn: null,
+        awaitingReply: false,
         createdAt: "2026-11-20T10:00:00.000Z",
       };
       contacts.unshift(contact);
@@ -28,10 +29,11 @@ export function fakeContactRepository(initial: Contact[] = []) {
       contact.stage = stage;
       return { ...contact };
     }),
-    setFollowUp: vi.fn(async (id: string, date: string | null) => {
+    updateFollowUp: vi.fn(async (id: string, followUp: { date: string | null; awaitingReply: boolean }) => {
       const contact = find(id);
       if (!contact) return null;
-      contact.followUpOn = date;
+      contact.followUpOn = followUp.date;
+      contact.awaitingReply = followUp.awaitingReply;
       return { ...contact };
     }),
   } satisfies ContactRepository;
@@ -46,6 +48,7 @@ export const aContact = (overrides: Partial<Contact> & { id: string }): Contact 
   phone: null,
   stage: "nouveau",
   followUpOn: null,
+  awaitingReply: false,
   createdAt: "2026-11-20T10:00:00.000Z",
   ...overrides,
 });

@@ -87,6 +87,7 @@ const contact = (id: string, stage: string): Contact => ({
   phone: null,
   stage,
   followUpOn: null,
+  awaitingReply: false,
   createdAt: "2026-11-20T10:00:00.000Z",
 });
 
@@ -244,7 +245,7 @@ describe("couche service · contact.service · relances (lot 4)", () => {
     const result = await service.setFollowUp("1", { date: "2026-11-21" });
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ followUpOn: "2026-11-21" }) });
-    expect(repository.setFollowUp).toHaveBeenCalledWith("1", "2026-11-21");
+    expect(repository.updateFollowUp).toHaveBeenCalledWith("1", { date: "2026-11-21", awaitingReply: false });
     expect(await service.getFollowUps()).toEqual([
       { contact: expect.objectContaining({ name: "Claire Martin" }), overdue: false },
     ]);
@@ -293,7 +294,7 @@ describe("couche service · contact.service · relances (lot 4)", () => {
     const { repository, service } = serviceWith([aContact({ id: "1" })]);
 
     expect(await service.setFollowUp("1", { date })).toEqual({ ok: false, error: "La date n'est pas valide" });
-    expect(repository.setFollowUp).not.toHaveBeenCalled();
+    expect(repository.updateFollowUp).not.toHaveBeenCalled();
   });
 
   it("refuse un contact inconnu", async () => {
@@ -306,3 +307,52 @@ describe("couche service · contact.service · relances (lot 4)", () => {
   });
 });
 
+describe("couche service · contact.service · relance faite (lot 5)", () => {
+  const now = () => new Date("2026-11-21T09:00:00Z");
+  const serviceWith = (contacts: Contact[]) => {
+    const repository = fakeRepository(contacts);
+    return { repository, service: createContactService(repository, now) };
+  };
+
+  // Critère 1 : « Relance faite » sort le contact de « À relancer ».
+  it("sort de « À relancer » un contact dont la relance est faite", async () => {
+    const { repository, service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-21" })]);
+
+    const result = await service.markFollowUpDone("1");
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ awaitingReply: true }) });
+    expect(repository.updateFollowUp).toHaveBeenCalledWith("1", { date: "2026-11-21", awaitingReply: true });
+    expect(await service.getFollowUps()).toEqual([]);
+  });
+
+  // Critère 2 : le contact est « En attente de réponse » et reste dans sa colonne.
+  it("laisse le contact dans sa colonne, en attente de réponse", async () => {
+    const { service } = serviceWith([aContact({ id: "1", stage: "rdv", followUpOn: "2026-11-18" })]);
+
+    await service.markFollowUpDone("1");
+
+    const rdv = (await service.getBoard()).columns.find((c) => c.stage === "rdv");
+    expect(rdv?.contacts).toEqual([expect.objectContaining({ id: "1", awaitingReply: true })]);
+  });
+
+  // Critère 3 : une nouvelle date retire l'attente et remplace l'ancienne date.
+  it("retire l'attente et remplace la date quand je fixe une nouvelle relance", async () => {
+    const { service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-18", awaitingReply: true })]);
+
+    const result = await service.setFollowUp("1", { date: "2026-11-21" });
+
+    expect(result).toEqual({
+      ok: true,
+      contact: expect.objectContaining({ followUpOn: "2026-11-21", awaitingReply: false }),
+    });
+    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: "1" }), overdue: false }]);
+  });
+
+  it("refuse de marquer faite une relance absente, ou un contact inconnu", async () => {
+    const { repository, service } = serviceWith([aContact({ id: "1" })]);
+
+    expect(await service.markFollowUpDone("1")).toEqual({ ok: false, error: "Aucune relance à marquer comme faite" });
+    expect(await service.markFollowUpDone("inconnu")).toEqual({ ok: false, error: "Contact introuvable" });
+    expect(repository.updateFollowUp).not.toHaveBeenCalled();
+  });
+});

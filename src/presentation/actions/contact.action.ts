@@ -68,3 +68,17 @@ export async function setFollowUpAction(_prev: FollowUpState, formData: FormData
   refresh();
   return {};
 }
+
+export async function markFollowUpDoneAction(id: string): Promise<FollowUpState> {
+  let result;
+  try {
+    result = await getContactService().markFollowUpDone(id);
+  } catch (error) {
+    console.error("markFollowUpDoneAction", error);
+    return { error: "Impossible d'enregistrer la relance, réessaie." };
+  }
+  if (!result.ok) return { error: result.error };
+
+  refresh();
+  return {};
+}

@@ -8,17 +8,20 @@ export type Contact = {
   phone: string | null;
   stage: string;
   followUpOn: string | null;
+  awaitingReply: boolean;
   createdAt: string;
 };
 
-export type NewContact = Omit<Contact, "id" | "createdAt" | "followUpOn">;
+export type NewContact = Omit<Contact, "id" | "createdAt" | "followUpOn" | "awaitingReply">;
+
+export type FollowUpUpdate = { date: string | null; awaitingReply: boolean };
 
 export interface ContactRepository {
   insert(contact: NewContact): Promise<Contact>;
   findAll(): Promise<Contact[]>;
   findById(id: string): Promise<Contact | null>;
   updateStage(id: string, stage: string): Promise<Contact | null>;
-  setFollowUp(id: string, date: string | null): Promise<Contact | null>;
+  updateFollowUp(id: string, followUp: FollowUpUpdate): Promise<Contact | null>;
 }
 
 type ContactRow = {
@@ -29,6 +32,7 @@ type ContactRow = {
   phone: string | null;
   stage: string;
   follow_up_on: string | null;
+  follow_up_done: number;
   created_at: string;
 };
 
@@ -40,10 +44,11 @@ const toContact = (row: ContactRow): Contact => ({
   phone: row.phone,
   stage: row.stage,
   followUpOn: row.follow_up_on,
+  awaitingReply: Number(row.follow_up_done) === 1,
   createdAt: row.created_at,
 });
 
-const COLUMNS = "id, name, company, email, phone, stage, follow_up_on, created_at";
+const COLUMNS = "id, name, company, email, phone, stage, follow_up_on, follow_up_done, created_at";
 
 export function createContactRepository(db: Database = getDatabase()): ContactRepository {
   return {
@@ -53,6 +58,7 @@ export function createContactRepository(db: Database = getDatabase()): ContactRe
         ...input,
         id: crypto.randomUUID(),
         followUpOn: null,
+        awaitingReply: false,
         createdAt: new Date().toISOString(),
       };
       await db.client.execute({
@@ -88,11 +94,11 @@ export function createContactRepository(db: Database = getDatabase()): ContactRe
       return row ? toContact(row) : null;
     },
 
-    async setFollowUp(id, date) {
+    async updateFollowUp(id, { date, awaitingReply }) {
       await db.ready;
       const { rows } = await db.client.execute({
-        sql: `UPDATE contacts SET follow_up_on = ? WHERE id = ? RETURNING ${COLUMNS}`,
-        args: [date, id],
+        sql: `UPDATE contacts SET follow_up_on = ?, follow_up_done = ? WHERE id = ? RETURNING ${COLUMNS}`,
+        args: [date, awaitingReply ? 1 : 0, id],
       });
       const row = rows[0] as unknown as ContactRow | undefined;
       return row ? toContact(row) : null;

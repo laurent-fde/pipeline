@@ -1,7 +1,14 @@
+import type { FollowUpState } from "@/presentation/actions/contact.action";
 import type { FollowUp } from "@/services/contact.service";
 import { Badge } from "@/presentation/components/ui/badge";
+import { FollowUpDoneButton } from "./follow-up-done-button";
 
-export function FollowUpList({ followUps }: { followUps: FollowUp[] }) {
+type FollowUpListProps = {
+  followUps: FollowUp[];
+  doneAction?: (id: string) => Promise<FollowUpState>;
+};
+
+export function FollowUpList({ followUps, doneAction }: FollowUpListProps) {
   if (followUps.length === 0) {
     return <p className="text-sm text-muted-foreground">Personne à relancer aujourd&apos;hui</p>;
   }
@@ -19,6 +26,7 @@ export function FollowUpList({ followUps }: { followUps: FollowUp[] }) {
             <time dateTime={contact.followUpOn ?? undefined} className="font-mono text-xs text-muted-foreground">
               {contact.followUpOn}
             </time>
+            {doneAction && <FollowUpDoneButton contactId={contact.id} contactName={contact.name} action={doneAction} />}
           </div>
         </li>
       ))}

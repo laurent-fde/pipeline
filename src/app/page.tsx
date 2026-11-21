@@ -1,7 +1,12 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { getContactService } from "@/services/contact.service";
-import { addContactAction, moveContactAction, setFollowUpAction } from "@/presentation/actions/contact.action";
+import {
+  addContactAction,
+  markFollowUpDoneAction,
+  moveContactAction,
+  setFollowUpAction,
+} from "@/presentation/actions/contact.action";
 import { ContactForm } from "@/presentation/components/contact-form";
 import { FollowUpList } from "@/presentation/components/follow-up-list";
 import { KanbanBoard } from "@/presentation/components/kanban-board";
@@ -17,7 +22,7 @@ async function Board() {
 async function FollowUps() {
   await connection();
   const followUps = await getContactService().getFollowUps();
-  return <FollowUpList followUps={followUps} />;
+  return <FollowUpList followUps={followUps} doneAction={markFollowUpDoneAction} />;
 }
 
 export default function Home() {

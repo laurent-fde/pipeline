@@ -21,6 +21,8 @@ const migrations = [
   `ALTER TABLE contacts ADD COLUMN stage TEXT NOT NULL DEFAULT 'nouveau'`,
   // Lot 4 : la date de relance (AAAA-MM-JJ), absente par défaut.
   `ALTER TABLE contacts ADD COLUMN follow_up_on TEXT`,
+  // Lot 5 : la relance a été faite, on attend la réponse (0 ou 1).
+  `ALTER TABLE contacts ADD COLUMN follow_up_done INTEGER NOT NULL DEFAULT 0`,
 ];
 
 async function migrate(client: Client) {
