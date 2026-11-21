@@ -23,4 +23,7 @@ Pages (`src/app/`), actions, composants et providers (`src/presentation/`).
 ## Comment vérifier
 - `pnpm lint` passe : il refuse tout import de `@/data` ici.
 - `grep -rnE "#[0-9a-fA-F]{3,6}|rgb\(|oklch\(|-(red|green|blue|zinc|slate|gray|neutral)-[0-9]" src/app src/presentation --include='*.tsx'` ne renvoie rien.
-- L'écran est lisible en clair et en sombre (bouton ☀️/🌙).
+- L'écran est lisible en clair et en sombre (bouton ☀️/🌙), vérifié dans le navigateur aux moments importants seulement, pas après chaque modification :
+  - à la fin d'un lot qui touche l'écran, avant la PR ;
+  - après un changement du thème (`globals.css`) ou un nouveau composant shadcn ;
+  - quand on corrige un bug visuel.

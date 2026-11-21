@@ -29,6 +29,7 @@ Argument : le numéro du lot ($ARGUMENTS).
 - Chaque critère a son test.
 - La sortie rouge a été vue avant le code.
 - Les règles de .claude/rules/ sont respectées.
+- Vérification écran en clair ET en sombre, dans le navigateur (`pnpm dev`, bouton ☀️/🌙), avec une capture de chaque mode. Une seule fois par lot, quand les tests sont verts et avant la PR, si le lot touche `src/app/`, `src/presentation/` ou `globals.css`. Pas après chaque modification. Regarde aussi la console (erreurs, avertissements Next.js) et la largeur (rien de coupé, pas de défilement inutile).
 
 ## 5. Ouvrir la PR
 - Une fois tous les tests verts, ouvre la PR de dev vers main (`gh pr create`) et donne-moi le lien.
