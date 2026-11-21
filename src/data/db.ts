@@ -17,6 +17,8 @@ const migrations = [
     phone TEXT,
     created_at TEXT NOT NULL
   )`,
+  // Lot 2 : l'étape du contact. Les contacts existants arrivent dans « nouveau ».
+  `ALTER TABLE contacts ADD COLUMN stage TEXT NOT NULL DEFAULT 'nouveau'`,
 ];
 
 async function migrate(client: Client) {
