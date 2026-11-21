@@ -1,8 +1,8 @@
 import {
   createContactRepository,
   type Contact,
+  type ContactFields,
   type ContactRepository,
-  type NewContact,
 } from "@/data/contact.repository";
 import { z } from "zod";
 import { parisToday } from "./today";
@@ -17,6 +17,12 @@ export type BoardColumn = { stage: Stage; label: string; count: number; contacts
 export type Board = { columns: BoardColumn[]; total: number };
 
 export type ContactErrors = { name?: string; email?: string };
+
+export type UpdateContactResult =
+  | { ok: true; contact: Contact }
+  | { ok: false; errors: ContactErrors; error?: string };
+
+export type DeleteContactResult = { ok: true } | { ok: false; error: string };
 
 export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: string };
 
@@ -50,7 +56,7 @@ export type ContactInput = { name?: string; company?: string; email?: string; ph
 // safeParse et non parse : une saisie refusée n'est pas une panne, on renvoie les erreurs.
 export function validateContactInput(
   input: ContactInput,
-): { ok: true; value: Omit<NewContact, "stage"> } | { ok: false; errors: ContactErrors } {
+): { ok: true; value: ContactFields } | { ok: false; errors: ContactErrors } {
   const result = contactSchema.safeParse(input);
   if (result.success) return { ok: true, value: result.data };
 
@@ -69,6 +75,18 @@ export function createContactService(repository: ContactRepository, now: () => D
       if (!result.ok) return result;
       // Un nouveau contact commence toujours à la première étape.
       return { ok: true, contact: await repository.insert({ ...result.value, stage: FIRST_STAGE }) };
+    },
+
+    // Mêmes règles qu'à l'ajout ; l'étape et la relance ne changent pas.
+    async updateContact(id: string, input: ContactInput): Promise<UpdateContactResult> {
+      const result = validateContactInput(input);
+      if (!result.ok) return result;
+      const contact = await repository.update(id, result.value);
+      return contact ? { ok: true, contact } : { ok: false, errors: {}, error: "Contact introuvable" };
+    },
+
+    async deleteContact(id: string): Promise<DeleteContactResult> {
+      return (await repository.delete(id)) ? { ok: true } : { ok: false, error: "Contact introuvable" };
     },
 
     listContacts(): Promise<Contact[]> {

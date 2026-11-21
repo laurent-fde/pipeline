@@ -14,6 +14,9 @@ export type Contact = {
 
 export type NewContact = Omit<Contact, "id" | "createdAt" | "followUpOn" | "awaitingReply">;
 
+// Les informations saisies d'un contact (sans étape ni relance).
+export type ContactFields = Omit<NewContact, "stage">;
+
 export type FollowUpUpdate = { date: string | null; awaitingReply: boolean };
 
 export interface ContactRepository {
@@ -22,6 +25,8 @@ export interface ContactRepository {
   findById(id: string): Promise<Contact | null>;
   updateStage(id: string, stage: string): Promise<Contact | null>;
   updateFollowUp(id: string, followUp: FollowUpUpdate): Promise<Contact | null>;
+  update(id: string, fields: ContactFields): Promise<Contact | null>;
+  delete(id: string): Promise<boolean>;
 }
 
 type ContactRow = {
@@ -102,6 +107,23 @@ export function createContactRepository(db: Database = getDatabase()): ContactRe
       });
       const row = rows[0] as unknown as ContactRow | undefined;
       return row ? toContact(row) : null;
+    },
+
+    // Les informations du contact seulement : l'étape et la relance ont leurs propres méthodes.
+    async update(id, { name, company, email, phone }) {
+      await db.ready;
+      const { rows } = await db.client.execute({
+        sql: `UPDATE contacts SET name = ?, company = ?, email = ?, phone = ? WHERE id = ? RETURNING ${COLUMNS}`,
+        args: [name, company, email, phone, id],
+      });
+      const row = rows[0] as unknown as ContactRow | undefined;
+      return row ? toContact(row) : null;
+    },
+
+    async delete(id) {
+      await db.ready;
+      const { rowsAffected } = await db.client.execute({ sql: "DELETE FROM contacts WHERE id = ?", args: [id] });
+      return rowsAffected > 0;
     },
   };
 }

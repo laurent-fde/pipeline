@@ -1,19 +1,27 @@
-import type { FollowUpState, MoveState } from "@/presentation/actions/contact.action";
+import type { ContactFormState, FollowUpState, MoveState } from "@/presentation/actions/contact.action";
 import type { Board, BoardColumn, Move } from "@/services/contact.service";
 import { Badge } from "@/presentation/components/ui/badge";
+import { ContactActions } from "./contact-actions";
 import { ContactCard } from "./contact-card";
 import { FollowUpForm } from "./follow-up-form";
 import { StageControls } from "./stage-controls";
 
 type MoveAction = (id: string, move: Move) => Promise<MoveState>;
 type FollowUpAction = (prev: FollowUpState, formData: FormData) => Promise<FollowUpState>;
+type UpdateAction = (prev: ContactFormState, formData: FormData) => Promise<ContactFormState>;
+type DeleteAction = (id: string) => Promise<{ error?: string }>;
 
 // Les actions posées sur chaque carte. Absentes : la carte est en lecture seule.
-type CardActions = { moveAction?: MoveAction; followUpAction?: FollowUpAction };
+type CardActions = {
+  moveAction?: MoveAction;
+  followUpAction?: FollowUpAction;
+  updateAction?: UpdateAction;
+  deleteAction?: DeleteAction;
+};
 
 const countLabel = (count: number) => `${count} contact${count > 1 ? "s" : ""}`;
 
-function Column({ column, moveAction, followUpAction }: { column: BoardColumn } & CardActions) {
+function Column({ column, moveAction, followUpAction, updateAction, deleteAction }: { column: BoardColumn } & CardActions) {
   const headingId = `colonne-${column.stage}`;
 
   return (
@@ -40,6 +48,9 @@ function Column({ column, moveAction, followUpAction }: { column: BoardColumn } 
               )}
               {followUpAction && (
                 <FollowUpForm contactId={contact.id} followUpOn={contact.followUpOn} action={followUpAction} />
+              )}
+              {updateAction && deleteAction && (
+                <ContactActions contact={contact} updateAction={updateAction} deleteAction={deleteAction} />
               )}
             </ContactCard>
           </li>

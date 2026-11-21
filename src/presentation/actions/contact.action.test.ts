@@ -2,7 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted : les simulations doivent exister avant les vi.mock, remontés en haut du fichier.
-const { addContact, moveContact, setFollowUp, markFollowUpDone, refresh } = vi.hoisted(() => ({
+const { addContact, moveContact, setFollowUp, markFollowUpDone, updateContact, deleteContact, refresh } = vi.hoisted(() => ({
+  updateContact: vi.fn(),
+  deleteContact: vi.fn(),
   addContact: vi.fn(),
   moveContact: vi.fn(),
   setFollowUp: vi.fn(),
@@ -11,11 +13,18 @@ const { addContact, moveContact, setFollowUp, markFollowUpDone, refresh } = vi.h
 }));
 
 vi.mock("@/services/contact.service", () => ({
-  getContactService: () => ({ addContact, moveContact, setFollowUp, markFollowUpDone }),
+  getContactService: () => ({ addContact, moveContact, setFollowUp, markFollowUpDone, updateContact, deleteContact }),
 }));
 vi.mock("next/cache", () => ({ refresh }));
 
-import { addContactAction, markFollowUpDoneAction, moveContactAction, setFollowUpAction } from "./contact.action";
+import {
+  addContactAction,
+  deleteContactAction,
+  markFollowUpDoneAction,
+  moveContactAction,
+  setFollowUpAction,
+  updateContactAction,
+} from "./contact.action";
 
 function formData(values: Record<string, string>) {
   const data = new FormData();
@@ -157,6 +166,57 @@ describe("couche présentation · markFollowUpDoneAction (lot 5)", () => {
     markFollowUpDone.mockRejectedValueOnce(new Error("SQLITE_BUSY"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     expect(await markFollowUpDoneAction("1")).toEqual({ error: "Impossible d'enregistrer la relance, réessaie." });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("couche présentation · updateContactAction et deleteContactAction (lot 6)", () => {
+  beforeEach(() => {
+    updateContact.mockReset();
+    deleteContact.mockReset();
+    refresh.mockReset();
+  });
+
+  // Critère 1 : la modification passe par le service, puis la page est rafraîchie.
+  it("passe la modification au service, rafraîchit la page et signale l'enregistrement", async () => {
+    updateContact.mockResolvedValue({ ok: true, contact: { id: "1" } });
+
+    const state = await updateContactAction({}, formData({ contactId: "1", ...saisie, company: "Studio Nord" }));
+
+    expect(updateContact).toHaveBeenCalledWith("1", { ...saisie, company: "Studio Nord" });
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(state).toEqual({ saved: true });
+  });
+
+  // Critère 2 : nom vide, les erreurs reviennent au formulaire avec la saisie.
+  it("renvoie les erreurs et la saisie sans rafraîchir", async () => {
+    updateContact.mockResolvedValue({ ok: false, errors: { name: "Le nom est obligatoire" } });
+
+    const state = await updateContactAction({}, formData({ contactId: "1", ...saisie, name: "" }));
+
+    expect(state).toEqual({ errors: { name: "Le nom est obligatoire" }, values: { ...saisie, name: "" } });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  // Critère 3 : la suppression passe par le service, puis la page est rafraîchie.
+  it("supprime via le service et rafraîchit la page", async () => {
+    deleteContact.mockResolvedValue({ ok: true });
+
+    expect(await deleteContactAction("1")).toEqual({});
+    expect(deleteContact).toHaveBeenCalledWith("1");
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("renvoie un message quand la base est en panne", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    updateContact.mockRejectedValue(new Error("SQLITE_BUSY"));
+    deleteContact.mockRejectedValue(new Error("SQLITE_BUSY"));
+
+    expect(await updateContactAction({}, formData({ contactId: "1", ...saisie }))).toEqual({
+      formError: "Impossible d'enregistrer le contact, réessaie.",
+      values: saisie,
+    });
+    expect(await deleteContactAction("1")).toEqual({ error: "Impossible de supprimer le contact, réessaie." });
     expect(refresh).not.toHaveBeenCalled();
   });
 });

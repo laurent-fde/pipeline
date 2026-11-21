@@ -3,9 +3,11 @@ import { Suspense } from "react";
 import { getContactService } from "@/services/contact.service";
 import {
   addContactAction,
+  deleteContactAction,
   markFollowUpDoneAction,
   moveContactAction,
   setFollowUpAction,
+  updateContactAction,
 } from "@/presentation/actions/contact.action";
 import { ContactForm } from "@/presentation/components/contact-form";
 import { FollowUpList } from "@/presentation/components/follow-up-list";
@@ -16,7 +18,15 @@ import { ThemeToggle } from "@/presentation/components/theme-toggle";
 async function Board() {
   await connection();
   const board = await getContactService().getBoard();
-  return <KanbanBoard board={board} moveAction={moveContactAction} followUpAction={setFollowUpAction} />;
+  return (
+    <KanbanBoard
+      board={board}
+      moveAction={moveContactAction}
+      followUpAction={setFollowUpAction}
+      updateAction={updateContactAction}
+      deleteAction={deleteContactAction}
+    />
+  );
 }
 
 async function FollowUps() {

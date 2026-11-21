@@ -356,3 +356,68 @@ describe("couche service · contact.service · relance faite (lot 5)", () => {
     expect(repository.updateFollowUp).not.toHaveBeenCalled();
   });
 });
+
+describe("couche service · contact.service · modifier ou supprimer (lot 6)", () => {
+  const now = () => new Date("2026-11-21T09:00:00Z");
+  const claire = aContact({ id: "1", name: "Claire Martin", company: "Atelier Lumen", stage: "rdv", followUpOn: "2026-11-21" });
+  const serviceWith = (contacts: Contact[]) => {
+    const repository = fakeRepository(contacts);
+    return { repository, service: createContactService(repository, now) };
+  };
+
+  // Critère 1 : je modifie l'entreprise, la carte affiche la nouvelle valeur.
+  it("enregistre la nouvelle entreprise, sans toucher à l'étape ni à la relance", async () => {
+    const { repository, service } = serviceWith([claire]);
+
+    const result = await service.updateContact("1", { name: "Claire Martin", company: "Studio Nord" });
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ company: "Studio Nord", stage: "rdv" }) });
+    expect(repository.update).toHaveBeenCalledWith("1", {
+      name: "Claire Martin",
+      company: "Studio Nord",
+      email: null,
+      phone: null,
+    });
+    const rdv = (await service.getBoard()).columns.find((c) => c.stage === "rdv");
+    expect(rdv?.contacts).toEqual([expect.objectContaining({ company: "Studio Nord", followUpOn: "2026-11-21" })]);
+  });
+
+  // Critère 2 : nom vide, « Le nom est obligatoire », rien ne change.
+  it("refuse un nom vide sans rien enregistrer", async () => {
+    const { repository, service } = serviceWith([claire]);
+
+    const result = await service.updateContact("1", { name: "  ", company: "Studio Nord" });
+
+    expect(result).toEqual({ ok: false, errors: { name: "Le nom est obligatoire" } });
+    expect(repository.update).not.toHaveBeenCalled();
+    expect((await service.listContacts())[0].company).toBe("Atelier Lumen");
+  });
+
+  it("refuse de modifier un contact inconnu", async () => {
+    const { service } = serviceWith([]);
+
+    expect(await service.updateContact("inconnu", { name: "Claire" })).toEqual({
+      ok: false,
+      errors: {},
+      error: "Contact introuvable",
+    });
+  });
+
+  // Critère 3 : après suppression, le contact disparaît du tableau et de « À relancer ».
+  it("supprime le contact du tableau et de « À relancer »", async () => {
+    const { service } = serviceWith([claire]);
+    expect(await service.getFollowUps()).toHaveLength(1);
+
+    expect(await service.deleteContact("1")).toEqual({ ok: true });
+
+    expect((await service.getBoard()).total).toBe(0);
+    expect(await service.getFollowUps()).toEqual([]);
+  });
+
+  it("refuse de supprimer un contact inconnu", async () => {
+    const { service } = serviceWith([]);
+
+    expect(await service.deleteContact("inconnu")).toEqual({ ok: false, error: "Contact introuvable" });
+  });
+});
+

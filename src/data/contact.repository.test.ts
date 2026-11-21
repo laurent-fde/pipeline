@@ -160,5 +160,29 @@ describe("couche données · contact.repository", () => {
 
     expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ awaitingReply: true });
   });
+
+  // Lot 6 · Critère 1 : les informations du contact sont modifiées, le reste est gardé.
+  it("modifie les informations d'un contact sans toucher à son étape ni à sa relance", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+    await repository.updateStage(saved.id, "rdv");
+    await repository.updateFollowUp(saved.id, { date: "2026-11-21", awaitingReply: false });
+
+    const updated = await repository.update(saved.id, { name: "Claire Martin", company: "Studio Nord", email: null, phone: null });
+
+    expect(updated).toMatchObject({ company: "Studio Nord", email: null, stage: "rdv", followUpOn: "2026-11-21" });
+    expect(await repository.findById(saved.id)).toEqual(updated);
+    expect(await repository.update("inconnu", claire)).toBeNull();
+  });
+
+  // Lot 6 · Critère 3 : le contact supprimé n'est plus en base.
+  it("supprime un contact", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+
+    expect(await repository.delete(saved.id)).toBe(true);
+    expect(await repository.findAll()).toEqual([]);
+    expect(await repository.delete(saved.id)).toBe(false);
+  });
 });
 
