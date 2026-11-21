@@ -47,3 +47,24 @@ export async function moveContactAction(id: string, move: Move): Promise<MoveSta
   refresh();
   return {};
 }
+
+export type FollowUpState = { error?: string };
+
+export async function setFollowUpAction(_prev: FollowUpState, formData: FormData): Promise<FollowUpState> {
+  const contactId = formData.get("contactId");
+  const date = formData.get("date");
+
+  let result;
+  try {
+    result = await getContactService().setFollowUp(String(contactId ?? ""), {
+      date: typeof date === "string" ? date : undefined,
+    });
+  } catch (error) {
+    console.error("setFollowUpAction", error);
+    return { error: "Impossible d'enregistrer la relance, réessaie." };
+  }
+  if (!result.ok) return { error: result.error };
+
+  refresh();
+  return {};
+}

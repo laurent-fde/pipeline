@@ -133,5 +133,18 @@ describe("couche données · contact.repository", () => {
 
     expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ stage: "proposition" });
   });
+
+  // Lot 4 · Critère 1 : la date de relance est enregistrée et relue.
+  it("enregistre la date de relance, absente par défaut", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+    expect(saved.followUpOn).toBeNull();
+
+    const updated = await repository.setFollowUp(saved.id, "2026-11-21");
+
+    expect(updated).toEqual({ ...saved, followUpOn: "2026-11-21" });
+    expect(await repository.findAll()).toEqual([{ ...saved, followUpOn: "2026-11-21" }]);
+    expect(await repository.setFollowUp("inconnu", "2026-11-21")).toBeNull();
+  });
 });
 

@@ -1,14 +1,19 @@
-import type { MoveState } from "@/presentation/actions/contact.action";
+import type { FollowUpState, MoveState } from "@/presentation/actions/contact.action";
 import type { Board, BoardColumn, Move } from "@/services/contact.service";
 import { Badge } from "@/presentation/components/ui/badge";
 import { ContactCard } from "./contact-card";
+import { FollowUpForm } from "./follow-up-form";
 import { StageControls } from "./stage-controls";
 
 type MoveAction = (id: string, move: Move) => Promise<MoveState>;
+type FollowUpAction = (prev: FollowUpState, formData: FormData) => Promise<FollowUpState>;
+
+// Les actions posées sur chaque carte. Absentes : la carte est en lecture seule.
+type CardActions = { moveAction?: MoveAction; followUpAction?: FollowUpAction };
 
 const countLabel = (count: number) => `${count} contact${count > 1 ? "s" : ""}`;
 
-function Column({ column, moveAction }: { column: BoardColumn; moveAction?: MoveAction }) {
+function Column({ column, moveAction, followUpAction }: { column: BoardColumn } & CardActions) {
   const headingId = `colonne-${column.stage}`;
 
   return (
@@ -23,7 +28,7 @@ function Column({ column, moveAction }: { column: BoardColumn; moveAction?: Move
       </header>
       <ul className="grid gap-2">
         {column.contacts.map((contact) => (
-          <li key={contact.id}>
+          <li key={contact.id} className="min-w-0">
             <ContactCard contact={contact}>
               {moveAction && (
                 <StageControls
@@ -33,6 +38,9 @@ function Column({ column, moveAction }: { column: BoardColumn; moveAction?: Move
                   action={moveAction}
                 />
               )}
+              {followUpAction && (
+                <FollowUpForm contactId={contact.id} followUpOn={contact.followUpOn} action={followUpAction} />
+              )}
             </ContactCard>
           </li>
         ))}
@@ -41,7 +49,7 @@ function Column({ column, moveAction }: { column: BoardColumn; moveAction?: Move
   );
 }
 
-export function KanbanBoard({ board, moveAction }: { board: Board; moveAction?: MoveAction }) {
+export function KanbanBoard({ board, ...actions }: { board: Board } & CardActions) {
   return (
     <div className="grid gap-4">
       {board.total === 0 && (
@@ -53,7 +61,7 @@ export function KanbanBoard({ board, moveAction }: { board: Board; moveAction?: 
       <div className="-mx-4 overflow-x-auto px-4 pb-2">
         <div className="grid auto-cols-[minmax(12rem,1fr)] grid-flow-col gap-3">
           {board.columns.map((column) => (
-            <Column key={column.stage} column={column} moveAction={moveAction} />
+            <Column key={column.stage} column={column} {...actions} />
           ))}
         </div>
       </div>

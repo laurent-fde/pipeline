@@ -21,6 +21,7 @@ const contact = (id: string, name: string, stage: string): Contact => ({
   email: null,
   phone: null,
   stage,
+  followUpOn: null,
   createdAt: "2026-11-20T10:00:00.000Z",
 });
 

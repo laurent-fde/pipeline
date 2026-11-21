@@ -2,18 +2,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted : les simulations doivent exister avant les vi.mock, remontés en haut du fichier.
-const { addContact, moveContact, refresh } = vi.hoisted(() => ({
+const { addContact, moveContact, setFollowUp, refresh } = vi.hoisted(() => ({
   addContact: vi.fn(),
   moveContact: vi.fn(),
+  setFollowUp: vi.fn(),
   refresh: vi.fn(),
 }));
 
 vi.mock("@/services/contact.service", () => ({
-  getContactService: () => ({ addContact, moveContact }),
+  getContactService: () => ({ addContact, moveContact, setFollowUp }),
 }));
 vi.mock("next/cache", () => ({ refresh }));
 
-import { addContactAction, moveContactAction } from "./contact.action";
+import { addContactAction, moveContactAction, setFollowUpAction } from "./contact.action";
 
 function formData(values: Record<string, string>) {
   const data = new FormData();
@@ -96,6 +97,40 @@ describe("couche présentation · moveContactAction (lot 3)", () => {
 
     expect(await moveContactAction("1", "next")).toEqual({ error: "Impossible de déplacer le contact, réessaie." });
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("couche présentation · setFollowUpAction (lot 4)", () => {
+  beforeEach(() => {
+    setFollowUp.mockReset();
+    refresh.mockReset();
+  });
+
+  // Critère 1 : la date part au service, puis la page est rafraîchie.
+  it("passe la date au service et rafraîchit la page", async () => {
+    setFollowUp.mockResolvedValue({ ok: true, contact: { id: "1" } });
+
+    expect(await setFollowUpAction({}, formData({ contactId: "1", date: "2026-11-21" }))).toEqual({});
+    expect(setFollowUp).toHaveBeenCalledWith("1", { date: "2026-11-21" });
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("renvoie l'erreur du service sans rafraîchir", async () => {
+    setFollowUp.mockResolvedValue({ ok: false, error: "La date n'est pas valide" });
+
+    expect(await setFollowUpAction({}, formData({ contactId: "1", date: "" }))).toEqual({
+      error: "La date n'est pas valide",
+    });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("renvoie un message quand la base est en panne", async () => {
+    setFollowUp.mockRejectedValue(new Error("SQLITE_BUSY"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await setFollowUpAction({}, formData({ contactId: "1", date: "2026-11-21" }))).toEqual({
+      error: "Impossible d'enregistrer la relance, réessaie.",
+    });
   });
 });
 

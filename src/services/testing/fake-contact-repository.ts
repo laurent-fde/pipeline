@@ -8,7 +8,12 @@ export function fakeContactRepository(initial: Contact[] = []) {
 
   const repository = {
     insert: vi.fn(async (input: NewContact) => {
-      const contact: Contact = { ...input, id: String(contacts.length + 1), createdAt: "2026-11-20T10:00:00.000Z" };
+      const contact: Contact = {
+        ...input,
+        id: String(contacts.length + 1),
+        followUpOn: null,
+        createdAt: "2026-11-20T10:00:00.000Z",
+      };
       contacts.unshift(contact);
       return contact;
     }),
@@ -23,6 +28,12 @@ export function fakeContactRepository(initial: Contact[] = []) {
       contact.stage = stage;
       return { ...contact };
     }),
+    setFollowUp: vi.fn(async (id: string, date: string | null) => {
+      const contact = find(id);
+      if (!contact) return null;
+      contact.followUpOn = date;
+      return { ...contact };
+    }),
   } satisfies ContactRepository;
 
   return repository;
@@ -34,6 +45,7 @@ export const aContact = (overrides: Partial<Contact> & { id: string }): Contact 
   email: null,
   phone: null,
   stage: "nouveau",
+  followUpOn: null,
   createdAt: "2026-11-20T10:00:00.000Z",
   ...overrides,
 });

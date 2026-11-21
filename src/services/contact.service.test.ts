@@ -86,6 +86,7 @@ const contact = (id: string, stage: string): Contact => ({
   email: null,
   phone: null,
   stage,
+  followUpOn: null,
   createdAt: "2026-11-20T10:00:00.000Z",
 });
 
@@ -227,3 +228,81 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
     expect(repository.updateStage).not.toHaveBeenCalled();
   });
 });
+
+describe("couche service · contact.service · relances (lot 4)", () => {
+  // Le 21 novembre 2026 à 10 h, heure de Paris.
+  const now = () => new Date("2026-11-21T09:00:00Z");
+  const serviceWith = (contacts: Contact[]) => {
+    const repository = fakeRepository(contacts);
+    return { repository, service: createContactService(repository, now) };
+  };
+
+  // Critère 1 : une relance fixée à aujourd'hui fait apparaître le contact dans « À relancer ».
+  it("fixe une relance à aujourd'hui et range le contact dans « À relancer »", async () => {
+    const { repository, service } = serviceWith([aContact({ id: "1", name: "Claire Martin" })]);
+
+    const result = await service.setFollowUp("1", { date: "2026-11-21" });
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ followUpOn: "2026-11-21" }) });
+    expect(repository.setFollowUp).toHaveBeenCalledWith("1", "2026-11-21");
+    expect(await service.getFollowUps()).toEqual([
+      { contact: expect.objectContaining({ name: "Claire Martin" }), overdue: false },
+    ]);
+  });
+
+  // Critère 2 : une relance à une date passée apparaît, indiquée en retard.
+  it("indique en retard une relance à une date passée", async () => {
+    const { service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-18" })]);
+
+    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: "1" }), overdue: true }]);
+  });
+
+  // Critère 3 : une relance à une date future n'apparaît pas.
+  it("n'affiche pas une relance à une date future", async () => {
+    const { service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-22" })]);
+
+    expect(await service.getFollowUps()).toEqual([]);
+  });
+
+  // Critère 4 : aucune relance due, la liste est vide (la présentation affiche le message).
+  it("renvoie une liste vide quand aucune relance n'est due", async () => {
+    const { service } = serviceWith([aContact({ id: "1" }), aContact({ id: "2", followUpOn: "2026-12-01" })]);
+
+    expect(await service.getFollowUps()).toEqual([]);
+  });
+
+  it("calcule « aujourd'hui » à l'heure de Paris, pas en UTC", async () => {
+    // 21 novembre 23 h 30 UTC = 22 novembre 0 h 30 à Paris.
+    const repository = fakeRepository([aContact({ id: "1", followUpOn: "2026-11-22" })]);
+    const service = createContactService(repository, () => new Date("2026-11-21T23:30:00Z"));
+
+    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: "1" }), overdue: false }]);
+  });
+
+  it("trie les relances de la plus ancienne à la plus récente", async () => {
+    const { service } = serviceWith([
+      aContact({ id: "1", followUpOn: "2026-11-21" }),
+      aContact({ id: "2", followUpOn: "2026-11-10" }),
+      aContact({ id: "3", followUpOn: "2026-11-15" }),
+    ]);
+
+    expect((await service.getFollowUps()).map((f) => f.contact.id)).toEqual(["2", "3", "1"]);
+  });
+
+  it.each(["", "21/11/2026", "2026-02-30", undefined])("refuse la date %j sans rien enregistrer", async (date) => {
+    const { repository, service } = serviceWith([aContact({ id: "1" })]);
+
+    expect(await service.setFollowUp("1", { date })).toEqual({ ok: false, error: "La date n'est pas valide" });
+    expect(repository.setFollowUp).not.toHaveBeenCalled();
+  });
+
+  it("refuse un contact inconnu", async () => {
+    const { service } = serviceWith([]);
+
+    expect(await service.setFollowUp("inconnu", { date: "2026-11-21" })).toEqual({
+      ok: false,
+      error: "Contact introuvable",
+    });
+  });
+});
+

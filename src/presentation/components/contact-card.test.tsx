@@ -11,6 +11,7 @@ const claire = {
   email: "claire@lumen.fr",
   phone: "06 12 34 56 78",
   stage: "nouveau",
+  followUpOn: null,
   createdAt: "2026-11-20T10:00:00.000Z",
 };
 

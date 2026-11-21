@@ -5,6 +5,7 @@ import {
   type NewContact,
 } from "@/data/contact.repository";
 import { z } from "zod";
+import { parisToday } from "./today";
 import { allowedMoves, FIRST_STAGE, MOVES, STAGES, targetStage, type AllowedMoves, type Move, type Stage } from "./stages";
 
 export type { Contact };
@@ -20,6 +21,15 @@ export type ContactErrors = { name?: string; email?: string };
 export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: string };
 
 const moveSchema = z.enum(MOVES);
+
+export type FollowUpInput = { date?: string };
+
+export type FollowUpResult = { ok: true; contact: Contact } | { ok: false; error: string };
+
+// Un contact à relancer : sa relance est aujourd'hui (à Paris) ou en retard.
+export type FollowUp = { contact: Contact; overdue: boolean };
+
+const followUpSchema = z.object({ date: z.iso.date({ error: "La date n'est pas valide" }) });
 
 export type AddContactResult = { ok: true; contact: Contact } | { ok: false; errors: ContactErrors };
 
@@ -51,7 +61,8 @@ export function validateContactInput(
   return { ok: false, errors };
 }
 
-export function createContactService(repository: ContactRepository) {
+// now : l'horloge, remplacée dans les tests pour fixer « aujourd'hui ».
+export function createContactService(repository: ContactRepository, now: () => Date = () => new Date()) {
   return {
     async addContact(input: ContactInput): Promise<AddContactResult> {
       const result = validateContactInput(input);
@@ -87,6 +98,24 @@ export function createContactService(repository: ContactRepository) {
 
       const moved = await repository.updateStage(id, stage);
       return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
+    },
+
+    async setFollowUp(id: string, input: FollowUpInput): Promise<FollowUpResult> {
+      const parsed = followUpSchema.safeParse(input);
+      if (!parsed.success) return { ok: false, error: "La date n'est pas valide" };
+
+      const contact = await repository.setFollowUp(id, parsed.data.date);
+      return contact ? { ok: true, contact } : { ok: false, error: "Contact introuvable" };
+    },
+
+    // Relances dues aujourd'hui ou en retard, de la plus ancienne à la plus récente.
+    async getFollowUps(): Promise<FollowUp[]> {
+      const today = parisToday(now());
+      const contacts = await repository.findAll();
+      return contacts
+        .filter((contact): contact is Contact & { followUpOn: string } => !!contact.followUpOn && contact.followUpOn <= today)
+        .sort((a, b) => a.followUpOn.localeCompare(b.followUpOn))
+        .map((contact) => ({ contact, overdue: contact.followUpOn < today }));
     },
   };
 }
