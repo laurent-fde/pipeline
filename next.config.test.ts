@@ -13,5 +13,7 @@ describe("next.config · en-têtes HTTP de protection", () => {
     expect(headers["Content-Security-Policy"]).toBe("frame-ancestors 'none'");
     expect(headers["X-Content-Type-Options"]).toBe("nosniff");
     expect(headers["Referrer-Policy"]).toBe("strict-origin-when-cross-origin");
+    // Contrôle de sécurité : HTTPS imposé par le navigateur, même sur un domaine personnalisé.
+    expect(headers["Strict-Transport-Security"]).toBe("max-age=63072000; includeSubDomains");
   });
 });
