@@ -131,5 +131,5 @@ Au-dessus du tableau, je cherche un contact par son nom, son entreprise ou son e
   → `contact.service.test.ts` « renvoie la vue appliquée, et ignore un filtre inconnu… », « accepte les paramètres d'adresse répétés… » ; `board-toolbar.test.tsx` « reprend la recherche et le filtre de l'adresse », « recale le champ sur l'adresse quand elle change ailleurs » ; vérifié dans le navigateur (rechargement de `?q=zzz&filtre=en-attente`).
 - [x] Étant donné un tableau filtré, quand je glisse une carte ou ouvre une fiche, alors tout fonctionne comme sur le tableau complet (lots 8 et 9).
   → `kanban-board.test.tsx` « garde le glisser-déposer et la fiche sur un tableau filtré », « garde la fiche ouverte quand le contact ne correspond plus au filtre, et le signale ».
-- [ ] Étant donné le thème clair ou sombre, quand j'utilise la recherche et les filtres, alors tout est lisible et rien n'est coupé, sur grand écran comme sur téléphone.
-  → vérifié dans le navigateur en clair et en sombre sur grand écran (1440 px). Largeur téléphone non vérifiée : les en-têtes anti-cadre (#33) et le blocage des fenêtres empêchent de simuler 390 px ; à vérifier sur un téléphone.
+- [x] Étant donné le thème clair ou sombre, quand j'utilise la recherche et les filtres, alors tout est lisible et rien n'est coupé, sur grand écran comme sur téléphone.
+  → vérifié dans le navigateur en clair et en sombre sur grand écran (1440 px) ; vérifié par Laurent sur téléphone après la mise en ligne (PR #38), rien de coupé.
