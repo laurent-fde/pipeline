@@ -309,7 +309,18 @@ describe("couche présentation · actions · limite d'appels (#32)", () => {
 
     await addContactAction({}, formData(saisie));
 
-    expect(check).toHaveBeenCalledWith("write:203.0.113.7");
+    expect(check).toHaveBeenCalledWith("203.0.113.7");
+  });
+
+  // Contrôle de sécurité : l'en-tête posé par Vercel lui-même passe avant x-forwarded-for.
+  it("préfère l'adresse donnée par Vercel (x-vercel-forwarded-for)", async () => {
+    addContact.mockResolvedValue({ ok: true, contact: {} });
+    requestHeaders.set("x-vercel-forwarded-for", "198.51.100.9");
+
+    await addContactAction({}, formData(saisie));
+
+    requestHeaders.delete("x-vercel-forwarded-for");
+    expect(check).toHaveBeenCalledWith("198.51.100.9");
   });
 
   it("refuse l'ajout au-delà de la limite et garde la saisie", async () => {
@@ -345,10 +356,12 @@ describe("couche présentation · actions · limite d'appels (#32)", () => {
 
   it("laisse passer si le compteur est en panne (la base répondra elle-même)", async () => {
     check.mockRejectedValue(new Error("base injoignable"));
-    vi.spyOn(console, "error").mockImplementation(() => {});
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
     moveContact.mockResolvedValue({ ok: true, contact: {} });
 
     expect(await moveContactAction(ID, "next")).toEqual({});
     expect(moveContact).toHaveBeenCalled();
+    // Contrôle de sécurité : la panne est repérable dans les journaux Vercel.
+    expect(log).toHaveBeenCalledWith("[limite-appels] compteur en panne, appel laissé passer", expect.any(Error));
   });
 });

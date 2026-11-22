@@ -15,17 +15,22 @@ export type ContactFormState = {
 
 const FIELDS = ["name", "company", "email", "phone"] as const;
 
-// #32 : chaque modification compte pour l'adresse du client (la première de x-forwarded-for, posée
-// par Vercel). Renvoie le message de refus au-delà de la limite, rien sinon. Compteur en panne :
-// on laisse passer, l'action rencontrera la même panne et l'annoncera.
+// #32 : chaque modification compte pour l'adresse du client. L'app suppose Vercel : la plateforme pose
+// x-vercel-forwarded-for et réécrit x-forwarded-for avec l'adresse réelle ; derrière un autre hébergeur,
+// ces en-têtes pourraient être falsifiés. Renvoie le message de refus au-delà de la limite, rien sinon.
+// Compteur en panne : on laisse passer (l'action rencontrera la même panne), avec un journal repérable.
 async function rateLimited(): Promise<string | undefined> {
   try {
     const list = await headers();
-    const ip = list.get("x-forwarded-for")?.split(",")[0]?.trim() || list.get("x-real-ip") || "inconnu";
-    const result = await getRateLimitService().check(`write:${ip}`);
+    const ip =
+      list.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+      list.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      list.get("x-real-ip") ||
+      "";
+    const result = await getRateLimitService().check(ip);
     return result.ok ? undefined : result.error;
   } catch (error) {
-    console.error("rateLimited", error);
+    console.error("[limite-appels] compteur en panne, appel laissé passer", error);
     return undefined;
   }
 }

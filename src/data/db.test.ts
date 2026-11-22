@@ -60,7 +60,7 @@ describe("couche données · db (migrations)", () => {
   it("note les migrations appliquées dans schema_migrations, sans écrire PRAGMA user_version", async () => {
     const db = await open(":memory:");
 
-    expect(await appliedVersion(db)).toBe(5);
+    expect(await appliedVersion(db)).toBe(6);
     const { rows } = await db.client.execute("PRAGMA user_version");
     expect(Number(rows[0].user_version)).toBe(0);
   });
@@ -83,7 +83,7 @@ describe("couche données · db (migrations)", () => {
 
     const db = await open(url);
 
-    expect(await appliedVersion(db)).toBe(5);
+    expect(await appliedVersion(db)).toBe(6);
     const { rows } = await db.client.execute("SELECT name FROM contacts");
     expect(rows.map((r) => r.name)).toEqual(["Claire Martin"]);
   });
@@ -95,7 +95,7 @@ describe("couche données · db (migrations)", () => {
     const db = await open(url);
 
     const { rows } = await db.client.execute("SELECT COUNT(*) AS n FROM schema_migrations");
-    expect(Number(rows[0].n)).toBe(5);
+    expect(Number(rows[0].n)).toBe(6);
   });
 
   // #34 : deux serveurs démarrent ensemble. Le second a lu « rien d'appliqué » juste avant que le premier
@@ -123,7 +123,7 @@ describe("couche données · db (migrations)", () => {
 
     await expect(migrate(lateServer)).resolves.toBeUndefined();
 
-    expect(await appliedVersion(db)).toBe(5);
+    expect(await appliedVersion(db)).toBe(6);
     const { rows } = await db.client.execute("SELECT version, COUNT(*) AS n FROM schema_migrations GROUP BY version HAVING n > 1");
     expect(rows).toEqual([]);
   });

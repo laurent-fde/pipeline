@@ -31,6 +31,8 @@ const migrations = [
     count INTEGER NOT NULL,
     PRIMARY KEY (key, window_start)
   )`,
+  // Revue de #32 : effacer les vieilles fenêtres sans parcourir toute la table.
+  `CREATE INDEX rate_limits_window ON rate_limits (window_start)`,
 ];
 
 async function appliedVersion(client: Client): Promise<number | null> {
