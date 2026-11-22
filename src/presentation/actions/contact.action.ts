@@ -100,6 +100,21 @@ export async function reopenContactAction(id: string, stage: Stage): Promise<Mov
   return {};
 }
 
+// Lot 8 : une carte déposée sur une colonne du kanban.
+export async function dropContactAction(id: string, stage: Stage): Promise<MoveState> {
+  let result;
+  try {
+    result = await getContactService().dropContact(id, stage);
+  } catch (error) {
+    console.error("dropContactAction", error);
+    return { error: "Impossible de déplacer le contact, réessaie." };
+  }
+  if (!result.ok) return { error: result.error };
+
+  refresh();
+  return {};
+}
+
 export type FollowUpState = { error?: string };
 
 export async function setFollowUpAction(_prev: FollowUpState, formData: FormData): Promise<FollowUpState> {

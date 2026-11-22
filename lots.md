@@ -78,3 +78,13 @@ Un contact Gagné ou Perdu peut revenir dans le pipeline : je le rouvre vers l'�
   → `contact.service.test.ts` « refuse de rouvrir un contact de %s vers %s, sans rien enregistrer » ; `stage-controls.test.tsx` « annonce l'erreur de « Rouvrir vers… » et garde la liste ouverte ».
 - [x] Étant donné un contact rouvert, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
   → `contact.repository.test.ts` « garde la nouvelle étape après un redémarrage » (rouvrir enregistre l'étape par le même `updateStage`).
+
+## Lot 8 · Glisser-déposer un contact sur le kanban
+
+Je fais glisser la carte d'un contact sur une autre colonne pour changer son étape, sans passer par les boutons. Seuls les déplacements déjà permis sont acceptés : colonne suivante, précédente, Perdu, et depuis Gagné ou Perdu, une étape en cours.
+
+- [ ] Étant donné un contact, quand je glisse sa carte sur une colonne permise, alors il passe dans cette colonne.
+- [ ] Étant donné une carte en cours de glissement, quand je regarde le tableau, alors les colonnes où je peux la déposer sont mises en évidence, en clair comme en sombre.
+- [ ] Étant donné une colonne non permise (par exemple Nouveau → RDV), quand j'y dépose la carte, alors « Ce déplacement n'est pas possible » s'affiche et le contact reste dans sa colonne.
+- [ ] Étant donné un contact déplacé par glisser-déposer, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
+- [ ] Étant donné le clavier ou un écran tactile, quand je veux changer d'étape, alors les boutons d'étape restent disponibles.

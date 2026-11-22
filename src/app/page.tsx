@@ -4,6 +4,7 @@ import { getContactService } from "@/services/contact.service";
 import {
   addContactAction,
   deleteContactAction,
+  dropContactAction,
   markFollowUpDoneAction,
   moveContactAction,
   reopenContactAction,
@@ -27,6 +28,7 @@ async function Board() {
       followUpAction={setFollowUpAction}
       updateAction={updateContactAction}
       deleteAction={deleteContactAction}
+      dropAction={dropContactAction}
     />
   );
 }

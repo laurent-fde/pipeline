@@ -53,3 +53,13 @@ export function allowedMoves(stage: string): AllowedMoves {
     lost: targetStage(stage, "lost") !== null,
   };
 }
+
+// Lot 8 : les colonnes où déposer une carte, dans l'ordre du tableau. Aucune règle nouvelle :
+// ce sont les arrivées des déplacements permis (suivante, précédente, Perdu) et de « Rouvrir vers… ».
+export function dropTargets(stage: string): Stage[] {
+  const targets = new Set<string>([
+    ...MOVES.map((move) => targetStage(stage, move)).filter((target) => target !== null),
+    ...reopenTargets(stage).map((target) => target.stage),
+  ]);
+  return STAGES.filter(({ id }) => targets.has(id)).map(({ id }) => id);
+}

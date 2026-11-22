@@ -548,3 +548,68 @@ describe("couche service · contact.service · identifiant de contact", () => {
     },
   );
 });
+
+// Lot 8 : glisser-déposer. Seuls les déplacements déjà permis sont acceptés.
+describe("couche service · contact.service · glisser-déposer (lot 8)", () => {
+  const serviceWith = (stage: string) => {
+    const repository = fakeRepository([aContact({ id: ID1, stage })]);
+    return { repository, service: createContactService(repository) };
+  };
+
+  // Critère 2 : chaque colonne indique où ses cartes peuvent être déposées.
+  it("donne à chaque colonne les colonnes où déposer ses cartes", async () => {
+    const board = await createContactService(fakeRepository()).getBoard();
+
+    expect(Object.fromEntries(board.columns.map((c) => [c.stage, c.dropTargets]))).toEqual({
+      nouveau: ["contacte", "perdu"],
+      contacte: ["nouveau", "rdv", "perdu"],
+      rdv: ["contacte", "proposition", "perdu"],
+      proposition: ["rdv", "gagne", "perdu"],
+      gagne: ["nouveau", "contacte", "rdv", "proposition", "perdu"],
+      perdu: ["nouveau", "contacte", "rdv", "proposition"],
+    });
+  });
+
+  // Critère 1 : un dépôt sur une colonne permise change l'étape.
+  it.each([
+    ["nouveau", "contacte"],
+    ["rdv", "contacte"],
+    ["proposition", "gagne"],
+    ["rdv", "perdu"],
+    ["gagne", "perdu"],
+    ["perdu", "rdv"],
+  ])("dépose un contact de %s sur %s", async (from, to) => {
+    const { repository, service } = serviceWith(from);
+
+    const result = await service.dropContact(ID1, to as never);
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
+    expect(repository.updateStage).toHaveBeenCalledWith(ID1, to);
+  });
+
+  // Critère 3 : un dépôt sur une colonne non permise est refusé, rien n'est enregistré.
+  it.each([
+    ["nouveau", "rdv"],
+    ["nouveau", "gagne"],
+    ["contacte", "proposition"],
+    ["rdv", "rdv"],
+    ["perdu", "gagne"],
+    ["perdu", "perdu"],
+    ["rdv", "inconnue"],
+  ])("refuse de déposer un contact de %s sur %s, sans rien enregistrer", async (from, to) => {
+    const { repository, service } = serviceWith(from);
+
+    const result = await service.dropContact(ID1, to as never);
+
+    expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
+    expect(repository.updateStage).not.toHaveBeenCalled();
+  });
+
+  it("refuse un contact inconnu ou un identifiant mal formé", async () => {
+    const { repository, service } = serviceWith("rdv");
+
+    expect(await service.dropContact(ID2, "proposition")).toEqual({ ok: false, error: "Contact introuvable" });
+    expect(await service.dropContact("abc", "proposition")).toEqual({ ok: false, error: "Contact introuvable" });
+    expect(repository.updateStage).not.toHaveBeenCalled();
+  });
+});

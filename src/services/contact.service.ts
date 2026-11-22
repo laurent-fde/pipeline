@@ -8,6 +8,7 @@ import { z } from "zod";
 import { parisToday } from "./today";
 import {
   allowedMoves,
+  dropTargets,
   FIRST_STAGE,
   MOVES,
   reopenTargets,
@@ -30,6 +31,8 @@ export type BoardColumn = {
   contacts: Contact[];
   moves: AllowedMoves;
   reopenTargets: ReopenTarget[];
+  // Lot 8 : les colonnes où déposer les cartes de cette colonne.
+  dropTargets: Stage[];
 };
 
 export type Board = { columns: BoardColumn[]; total: number };
@@ -142,6 +145,7 @@ export function createContactService(repository: ContactRepository, now: () => D
           contacts: inColumn,
           moves: allowedMoves(id),
           reopenTargets: reopenTargets(id),
+          dropTargets: dropTargets(id),
         };
       });
       return { columns, total: contacts.length };
@@ -178,6 +182,22 @@ export function createContactService(repository: ContactRepository, now: () => D
 
       const moved = await repository.updateStage(id, parsedStage.data);
       return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
+    },
+
+    // Lot 8 : une carte déposée sur une colonne. Seuls les déplacements déjà permis sont acceptés.
+    async dropContact(id: string, stage: Stage): Promise<MoveResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
+      const parsedStage = stageSchema.safeParse(stage);
+      if (!parsedStage.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: NOT_FOUND };
+      if (!dropTargets(contact.stage).includes(parsedStage.data)) {
+        return { ok: false, error: "Ce déplacement n'est pas possible" };
+      }
+
+      const moved = await repository.updateStage(id, parsedStage.data);
+      return moved ? { ok: true, contact: moved } : { ok: false, error: NOT_FOUND };
     },
 
     async setFollowUp(id: string, input: FollowUpInput): Promise<FollowUpResult> {
