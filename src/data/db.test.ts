@@ -4,7 +4,25 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@libsql/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase, type Database } from "./db";
+import { openDatabase, resolveDatabaseUrl, type Database } from "./db";
+
+describe("couche données · db (adresse de la base)", () => {
+  it("utilise DATABASE_URL quand elle est remplie", () => {
+    expect(resolveDatabaseUrl({ DATABASE_URL: "libsql://pipeline.turso.io", VERCEL: "1" })).toBe(
+      "libsql://pipeline.turso.io",
+    );
+  });
+
+  it("retombe sur la base locale hors Vercel quand DATABASE_URL est vide ou absente", () => {
+    expect(resolveDatabaseUrl({ DATABASE_URL: "" })).toBe("file:.data/pipeline.db");
+    expect(resolveDatabaseUrl({})).toBe("file:.data/pipeline.db");
+  });
+
+  it("refuse de démarrer sur Vercel sans DATABASE_URL, avec un message clair", () => {
+    expect(() => resolveDatabaseUrl({ VERCEL: "1" })).toThrow(/DATABASE_URL/);
+    expect(() => resolveDatabaseUrl({ VERCEL: "1", DATABASE_URL: "" })).toThrow(/DATABASE_URL/);
+  });
+});
 
 // Turso Cloud refuse `PRAGMA user_version = N` : le numéro de migration vit dans une table.
 describe("couche données · db (migrations)", () => {

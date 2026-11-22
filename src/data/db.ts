@@ -53,13 +53,23 @@ export function openDatabase(url: string, authToken?: string): Database {
   return { client, ready: migrate(client) };
 }
 
+// Adresse de la base. || et non ?? : une DATABASE_URL vide (copiée de .env.example) compte comme absente.
+// Sur Vercel (VERCEL est posée par la plateforme), le disque n'est pas durable : pas de repli local,
+// une variable oubliée doit planter clairement plutôt que perdre les contacts en silence.
+export function resolveDatabaseUrl(env: Record<string, string | undefined>): string {
+  if (env.DATABASE_URL) return env.DATABASE_URL;
+  if (env.VERCEL) {
+    throw new Error("DATABASE_URL manquante : ajoute-la (et DATABASE_AUTH_TOKEN) dans les variables du projet Vercel.");
+  }
+  return LOCAL_URL;
+}
+
 // Une seule connexion pour toute l'app (conservée entre les rechargements de `pnpm dev`).
 const globalForDb = globalThis as unknown as { pipelineDb?: Database };
 
 export function getDatabase(): Database {
   if (!globalForDb.pipelineDb) {
-    // || et non ?? : une DATABASE_URL vide (copiée de .env.example) retombe sur la base locale.
-    const url = process.env.DATABASE_URL || LOCAL_URL;
+    const url = resolveDatabaseUrl(process.env);
     if (url === LOCAL_URL) mkdirSync(LOCAL_DIR, { recursive: true });
     globalForDb.pipelineDb = openDatabase(url, process.env.DATABASE_AUTH_TOKEN || undefined);
   }
