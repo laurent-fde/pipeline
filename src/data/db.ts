@@ -54,11 +54,14 @@ export function openDatabase(url: string, authToken?: string): Database {
 }
 
 // Adresse de la base. || et non ?? : une DATABASE_URL vide (copiée de .env.example) compte comme absente.
-// Sur Vercel (VERCEL est posée par la plateforme), le disque n'est pas durable : pas de repli local,
-// une variable oubliée doit planter clairement plutôt que perdre les contacts en silence.
+// Sur un déploiement Vercel (VERCEL_ENV = production ou preview, posée par la plateforme), le disque
+// n'est pas durable : pas de repli local, une variable oubliée doit planter clairement plutôt que perdre
+// les contacts en silence. #31 : on ne teste pas VERCEL, que `vercel env pull` peut écrire dans .env.local.
+const DEPLOYED = new Set(["production", "preview"]);
+
 export function resolveDatabaseUrl(env: Record<string, string | undefined>): string {
   if (env.DATABASE_URL) return env.DATABASE_URL;
-  if (env.VERCEL) {
+  if (env.VERCEL_ENV && DEPLOYED.has(env.VERCEL_ENV)) {
     throw new Error("DATABASE_URL manquante : ajoute-la (et DATABASE_AUTH_TOKEN) dans les variables du projet Vercel.");
   }
   return LOCAL_URL;

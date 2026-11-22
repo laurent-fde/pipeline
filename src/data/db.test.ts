@@ -8,7 +8,7 @@ import { openDatabase, resolveDatabaseUrl, type Database } from "./db";
 
 describe("couche données · db (adresse de la base)", () => {
   it("utilise DATABASE_URL quand elle est remplie", () => {
-    expect(resolveDatabaseUrl({ DATABASE_URL: "libsql://pipeline.turso.io", VERCEL: "1" })).toBe(
+    expect(resolveDatabaseUrl({ DATABASE_URL: "libsql://pipeline.turso.io", VERCEL_ENV: "production" })).toBe(
       "libsql://pipeline.turso.io",
     );
   });
@@ -18,13 +18,18 @@ describe("couche données · db (adresse de la base)", () => {
     expect(resolveDatabaseUrl({})).toBe("file:.data/pipeline.db");
   });
 
-  it("refuse de démarrer sur Vercel sans DATABASE_URL, avec un message clair", () => {
-    expect(() => resolveDatabaseUrl({ VERCEL: "1" })).toThrow(/DATABASE_URL/);
-    expect(() => resolveDatabaseUrl({ VERCEL: "1", DATABASE_URL: "" })).toThrow(/DATABASE_URL/);
+  it("refuse de démarrer sur un déploiement Vercel (production ou preview) sans DATABASE_URL", () => {
+    expect(() => resolveDatabaseUrl({ VERCEL: "1", VERCEL_ENV: "production" })).toThrow(/DATABASE_URL/);
+    expect(() => resolveDatabaseUrl({ VERCEL: "1", VERCEL_ENV: "preview", DATABASE_URL: "" })).toThrow(/DATABASE_URL/);
+  });
+
+  // #31 : `vercel env pull` peut écrire VERCEL=1 dans .env.local ; en local, la base locale reste utilisée.
+  it("garde la base locale en développement, même avec VERCEL=1 venu de `vercel env pull`", () => {
+    expect(resolveDatabaseUrl({ VERCEL: "1", VERCEL_ENV: "development" })).toBe("file:.data/pipeline.db");
+    expect(resolveDatabaseUrl({ VERCEL: "1" })).toBe("file:.data/pipeline.db");
   });
 });
 
-// Turso Cloud refuse `PRAGMA user_version = N` : le numéro de migration vit dans une table.
 describe("couche données · db (migrations)", () => {
   const opened: Database[] = [];
   const tempDirs: string[] = [];
