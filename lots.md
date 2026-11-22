@@ -5,7 +5,7 @@ Découpage de Pipeline en lots, à partir d'`INTENT.md`. Un lot = une chose que 
 ## Repères
 - **Utilisateur** : une seule personne, qui prospecte.
 - **Contact** : nom (obligatoire), entreprise, e-mail, téléphone.
-- **Étapes** : Nouveau → Contacté → RDV → Proposition → Gagné. « Perdu » est atteint depuis n'importe quelle étape.
+- **Étapes** : Nouveau → Contacté → RDV → Proposition → Gagné. « Perdu » est atteint depuis n'importe quelle étape. Un contact Gagné ou Perdu peut être rouvert vers une étape en cours (lot 7).
 - **En attente de réponse** : ce n'est pas une étape, c'est l'état d'un contact relancé dont on attend la réponse (lot 5).
 - **Hors périmètre** : pas de connexion, pas de gestion de droits, pas de multi-utilisateur.
 
@@ -34,7 +34,7 @@ Les contacts sont rangés en colonnes, une par étape. Un nouveau contact arrive
 Sur la carte d'un contact, je le fais passer à l'étape suivante, je le ramène à la précédente en cas d'erreur, ou je le marque perdu.
 
 - [ ] Étant donné un contact dans une colonne, quand je clique « Étape suivante », alors il passe dans la colonne suivante.
-- [ ] Étant donné un contact qui n'est pas dans Nouveau, quand je clique « Étape précédente », alors il revient dans la colonne précédente.
+- [ ] Étant donné un contact qui n'est ni dans Nouveau, ni dans Gagné ou Perdu, quand je clique « Étape précédente », alors il revient dans la colonne précédente. (Gagné et Perdu en sortent par « Rouvrir vers… », lot 7.)
 - [ ] Étant donné un contact à n'importe quelle étape, quand je clique « Marquer perdu », alors il passe dans la colonne Perdu.
 - [ ] Étant donné un contact dans Gagné ou Perdu, quand j'affiche sa carte, alors « Étape suivante » est indisponible.
 - [ ] Étant donné un contact déplacé, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
@@ -65,3 +65,26 @@ Je corrige les informations d'un contact, ou je le supprime après confirmation.
 - [ ] Étant donné une modification avec un nom vide, quand je valide, alors « Le nom est obligatoire » s'affiche et rien ne change.
 - [ ] Étant donné un contact, quand je clique « Supprimer » puis confirme, alors il disparaît du tableau et de « À relancer ».
 - [ ] Étant donné la demande de confirmation, quand j'annule, alors le contact reste.
+
+## Lot 7 · Rouvrir un contact Gagné ou Perdu
+
+Un contact Gagné ou Perdu peut revenir dans le pipeline : je le rouvre vers l'étape en cours de mon choix. Livré avec la PR #13 ; lot créé ensuite pour rattacher la fonctionnalité (#14, #18).
+
+- [x] Étant donné un contact Gagné ou Perdu, quand j'affiche sa carte, alors « Rouvrir vers… » est proposé ; sur un contact en cours, il ne l'est pas.
+  → `contact.service.test.ts` « propose de rouvrir vers Nouveau, Contacté, RDV ou Proposition, seulement depuis Gagné ou Perdu » ; `kanban-board.test.tsx` « propose « Rouvrir vers… » sur une carte Perdu, pas sur une carte RDV ».
+- [x] Étant donné « Rouvrir vers… » déplié, quand je choisis une étape parmi Nouveau, Contacté, RDV et Proposition, alors le contact passe dans cette colonne.
+  → `contact.service.test.ts` « rouvre un contact de %s vers %s » ; `stage-controls.test.tsx` « rouvre un contact Gagné ou Perdu vers l'étape choisie ».
+- [x] Étant donné un contact en cours, ou une étape d'arrivée Gagné, Perdu ou inconnue, quand je demande à le rouvrir, alors c'est refusé et rien n'est enregistré.
+  → `contact.service.test.ts` « refuse de rouvrir un contact de %s vers %s, sans rien enregistrer » ; `stage-controls.test.tsx` « annonce l'erreur de « Rouvrir vers… » et garde la liste ouverte ».
+- [x] Étant donné un contact rouvert, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
+  → `contact.repository.test.ts` « garde la nouvelle étape après un redémarrage » (rouvrir enregistre l'étape par le même `updateStage`).
+
+## Lot 8 · Glisser-déposer un contact sur le kanban
+
+Je fais glisser la carte d'un contact sur une autre colonne pour changer son étape, sans passer par les boutons. Seuls les déplacements déjà permis sont acceptés : colonne suivante, précédente, Perdu, et depuis Gagné ou Perdu, une étape en cours.
+
+- [ ] Étant donné un contact, quand je glisse sa carte sur une colonne permise, alors il passe dans cette colonne.
+- [ ] Étant donné une carte en cours de glissement, quand je regarde le tableau, alors les colonnes où je peux la déposer sont mises en évidence, en clair comme en sombre.
+- [ ] Étant donné une colonne non permise (par exemple Nouveau → RDV), quand j'y dépose la carte, alors « Ce déplacement n'est pas possible » s'affiche et le contact reste dans sa colonne.
+- [ ] Étant donné un contact déplacé par glisser-déposer, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
+- [ ] Étant donné le clavier ou un écran tactile, quand je veux changer d'étape, alors les boutons d'étape restent disponibles.

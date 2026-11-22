@@ -1,6 +1,7 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Board, Contact } from "@/services/contact.service";
+import { allowedMoves, dropTargets, reopenTargets } from "@/services/stages";
 import { KanbanBoard } from "./kanban-board";
 
 afterEach(cleanup);
@@ -29,8 +30,16 @@ const contact = (id: string, name: string, stage: string): Contact => ({
 function board(contacts: Contact[]): Board {
   const columns = LABELS.map(([stage, label]) => {
     const inColumn = contacts.filter((c) => c.stage === stage);
-    const moves = { previous: stage !== "nouveau", next: stage !== "gagne" && stage !== "perdu", lost: stage !== "perdu" };
-    return { stage, label, count: inColumn.length, contacts: inColumn, moves, reopenTargets: [] };
+    // Les vraies règles de stages.ts, pour que la fixture ne dérive plus du service (#16).
+    return {
+      stage,
+      label,
+      count: inColumn.length,
+      contacts: inColumn,
+      moves: allowedMoves(stage),
+      reopenTargets: reopenTargets(stage),
+      dropTargets: dropTargets(stage),
+    };
   });
   return { columns, total: contacts.length };
 }
@@ -108,5 +117,107 @@ describe("couche présentation · KanbanBoard", () => {
     expect(suivante("Nouveau").disabled).toBe(false);
     expect(suivante("Gagné").disabled).toBe(true);
   });
+
+  // #16 : les cibles de « Rouvrir vers… » de la colonne arrivent jusqu'aux cartes.
+  it("propose « Rouvrir vers… » sur une carte Perdu, pas sur une carte RDV", () => {
+    render(
+      <KanbanBoard
+        board={board([contact("1", "Claire Martin", "perdu"), contact("2", "Paul Durand", "rdv")])}
+        moveAction={vi.fn()}
+        reopenAction={vi.fn()}
+      />,
+    );
+
+    expect(within(column("Perdu")).getByRole("button", { name: /Rouvrir vers/ })).toBeDefined();
+    expect(within(column("RDV")).queryByRole("button", { name: /Rouvrir vers/ })).toBeNull();
+  });
+
+  it("n'active pas « Étape précédente » sur une carte Gagné ou Perdu", () => {
+    render(
+      <KanbanBoard
+        board={board([contact("1", "Claire Martin", "gagne"), contact("2", "Paul Durand", "perdu")])}
+        moveAction={vi.fn()}
+        reopenAction={vi.fn()}
+      />,
+    );
+
+    for (const label of ["Gagné", "Perdu"]) {
+      const precedente = within(column(label)).queryByRole("button", { name: "Étape précédente" }) as HTMLButtonElement | null;
+      expect(precedente === null || precedente.disabled).toBe(true);
+    }
+  });
 });
 
+// Lot 8 : glisser-déposer une carte sur une autre colonne.
+describe("couche présentation · KanbanBoard · glisser-déposer (lot 8)", () => {
+  const dataTransfer = () => ({ setData: vi.fn(), getData: vi.fn(), effectAllowed: "", dropEffect: "" });
+  const card = (name: string) => screen.getByText(name).closest("li") as HTMLElement;
+  const contacts = [contact("1", "Claire Martin", "nouveau"), contact("2", "Paul Durand", "rdv")];
+
+  it("rend les cartes déplaçables seulement quand le dépôt est branché", () => {
+    const { unmount } = render(<KanbanBoard board={board(contacts)} />);
+    expect(card("Claire Martin").getAttribute("draggable")).not.toBe("true");
+    unmount();
+
+    render(<KanbanBoard board={board(contacts)} dropAction={vi.fn()} />);
+    expect(card("Claire Martin").getAttribute("draggable")).toBe("true");
+  });
+
+  // Critère 2 : pendant le glissement, les colonnes permises sont mises en évidence.
+  it("met en évidence les colonnes où déposer la carte pendant le glissement", () => {
+    render(<KanbanBoard board={board(contacts)} dropAction={vi.fn()} />);
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+
+    expect(column("Contacté").dataset.drop).toBe("allowed");
+    expect(column("Perdu").dataset.drop).toBe("allowed");
+    expect(column("RDV").dataset.drop).toBe("refused");
+    expect(column("Nouveau").dataset.drop).toBe("source");
+
+    fireEvent.dragEnd(card("Claire Martin"));
+    expect(column("Contacté").dataset.drop).toBeUndefined();
+  });
+
+  // Critère 1 : déposer sur une colonne permise demande le déplacement au service.
+  it("demande le déplacement quand la carte est déposée sur une autre colonne", async () => {
+    const dropAction = vi.fn(async () => ({}));
+    render(<KanbanBoard board={board(contacts)} dropAction={dropAction} />);
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    fireEvent.dragOver(column("Contacté"), { dataTransfer: dataTransfer() });
+    fireEvent.drop(column("Contacté"), { dataTransfer: dataTransfer() });
+
+    await vi.waitFor(() => expect(dropAction).toHaveBeenCalledWith("1", "contacte"));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  // Critère 3 : un dépôt refusé par le service est annoncé, la carte reste dans sa colonne.
+  it("annonce le refus d'un dépôt sur une colonne non permise", async () => {
+    const dropAction = vi.fn(async () => ({ error: "Ce déplacement n'est pas possible" }));
+    render(<KanbanBoard board={board(contacts)} dropAction={dropAction} />);
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    fireEvent.drop(column("RDV"), { dataTransfer: dataTransfer() });
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Ce déplacement n'est pas possible");
+    expect(dropAction).toHaveBeenCalledWith("1", "rdv");
+    expect(within(column("Nouveau")).getByText("Claire Martin")).toBeDefined();
+  });
+
+  it("ne fait rien quand la carte est reposée dans sa propre colonne", () => {
+    const dropAction = vi.fn(async () => ({}));
+    render(<KanbanBoard board={board(contacts)} dropAction={dropAction} />);
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    fireEvent.drop(column("Nouveau"), { dataTransfer: dataTransfer() });
+
+    expect(dropAction).not.toHaveBeenCalled();
+  });
+
+  // Critère 5 : les boutons d'étape restent là, pour le clavier et le tactile.
+  it("garde les boutons d'étape sur les cartes déplaçables", () => {
+    render(<KanbanBoard board={board(contacts)} moveAction={vi.fn()} dropAction={vi.fn()} />);
+
+    expect(within(card("Claire Martin")).getByRole("button", { name: "Étape suivante" })).toBeDefined();
+  });
+});

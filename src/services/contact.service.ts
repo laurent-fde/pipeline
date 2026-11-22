@@ -8,6 +8,7 @@ import { z } from "zod";
 import { parisToday } from "./today";
 import {
   allowedMoves,
+  dropTargets,
   FIRST_STAGE,
   MOVES,
   reopenTargets,
@@ -30,6 +31,8 @@ export type BoardColumn = {
   contacts: Contact[];
   moves: AllowedMoves;
   reopenTargets: ReopenTarget[];
+  // Lot 8 : les colonnes où déposer les cartes de cette colonne.
+  dropTargets: Stage[];
 };
 
 export type Board = { columns: BoardColumn[]; total: number };
@@ -45,6 +48,11 @@ export type DeleteContactResult = { ok: true } | { ok: false; error: string };
 export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: string };
 
 const moveSchema = z.enum(MOVES);
+
+// L'identifiant d'un contact vient du navigateur : la base n'en crée qu'au format UUID.
+const idSchema = z.uuid();
+const isContactId = (id: unknown): id is string => idSchema.safeParse(id).success;
+const NOT_FOUND = "Contact introuvable";
 
 const stageSchema = z.enum(STAGES.map((stage) => stage.id));
 
@@ -109,6 +117,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Mêmes règles qu'à l'ajout ; l'étape et la relance ne changent pas.
     async updateContact(id: string, input: ContactInput): Promise<UpdateContactResult> {
+      if (!isContactId(id)) return { ok: false, errors: {}, error: NOT_FOUND };
       const result = validateContactInput(input);
       if (!result.ok) return result;
       const contact = await repository.update(id, result.value);
@@ -116,6 +125,7 @@ export function createContactService(repository: ContactRepository, now: () => D
     },
 
     async deleteContact(id: string): Promise<DeleteContactResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       return (await repository.delete(id)) ? { ok: true } : { ok: false, error: "Contact introuvable" };
     },
 
@@ -135,6 +145,7 @@ export function createContactService(repository: ContactRepository, now: () => D
           contacts: inColumn,
           moves: allowedMoves(id),
           reopenTargets: reopenTargets(id),
+          dropTargets: dropTargets(id),
         };
       });
       return { columns, total: contacts.length };
@@ -142,6 +153,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Étape suivante, précédente ou Perdu : la règle décide, la couche données enregistre.
     async moveContact(id: string, move: Move): Promise<MoveResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const parsedMove = moveSchema.safeParse(move);
       if (!parsedMove.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
 
@@ -157,6 +169,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Rouvrir un contact Gagné ou Perdu, vers une étape en cours choisie à la main.
     async reopenContact(id: string, stage: Stage): Promise<MoveResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const parsedStage = stageSchema.safeParse(stage);
       if (!parsedStage.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
 
@@ -171,7 +184,24 @@ export function createContactService(repository: ContactRepository, now: () => D
       return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
     },
 
+    // Lot 8 : une carte déposée sur une colonne. Seuls les déplacements déjà permis sont acceptés.
+    async dropContact(id: string, stage: Stage): Promise<MoveResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
+      const parsedStage = stageSchema.safeParse(stage);
+      if (!parsedStage.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: NOT_FOUND };
+      if (!dropTargets(contact.stage).includes(parsedStage.data)) {
+        return { ok: false, error: "Ce déplacement n'est pas possible" };
+      }
+
+      const moved = await repository.updateStage(id, parsedStage.data);
+      return moved ? { ok: true, contact: moved } : { ok: false, error: NOT_FOUND };
+    },
+
     async setFollowUp(id: string, input: FollowUpInput): Promise<FollowUpResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const parsed = followUpSchema.safeParse(input);
       if (!parsed.success) return { ok: false, error: "La date n'est pas valide" };
 
@@ -182,6 +212,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Relance faite : le contact attend une réponse, garde sa date et reste dans sa colonne.
     async markFollowUpDone(id: string): Promise<FollowUpResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const contact = await repository.findById(id);
       if (!contact) return { ok: false, error: "Contact introuvable" };
       if (!contact.followUpOn) return { ok: false, error: "Aucune relance à marquer comme faite" };

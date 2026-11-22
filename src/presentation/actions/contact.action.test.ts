@@ -2,26 +2,30 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.hoisted : les simulations doivent exister avant les vi.mock, remontés en haut du fichier.
-const { addContact, moveContact, setFollowUp, markFollowUpDone, updateContact, deleteContact, refresh } = vi.hoisted(() => ({
+const { addContact, moveContact, reopenContact, dropContact, setFollowUp, markFollowUpDone, updateContact, deleteContact, refresh } = vi.hoisted(() => ({
   updateContact: vi.fn(),
   deleteContact: vi.fn(),
   addContact: vi.fn(),
   moveContact: vi.fn(),
+  reopenContact: vi.fn(),
+  dropContact: vi.fn(),
   setFollowUp: vi.fn(),
   markFollowUpDone: vi.fn(),
   refresh: vi.fn(),
 }));
 
 vi.mock("@/services/contact.service", () => ({
-  getContactService: () => ({ addContact, moveContact, setFollowUp, markFollowUpDone, updateContact, deleteContact }),
+  getContactService: () => ({ addContact, moveContact, reopenContact, dropContact, setFollowUp, markFollowUpDone, updateContact, deleteContact }),
 }));
 vi.mock("next/cache", () => ({ refresh }));
 
 import {
   addContactAction,
   deleteContactAction,
+  dropContactAction,
   markFollowUpDoneAction,
   moveContactAction,
+  reopenContactAction,
   setFollowUpAction,
   updateContactAction,
 } from "./contact.action";
@@ -106,6 +110,68 @@ describe("couche présentation · moveContactAction (lot 3)", () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
 
     expect(await moveContactAction("1", "next")).toEqual({ error: "Impossible de déplacer le contact, réessaie." });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+// #15 : rouvrir un contact Gagné ou Perdu passe par le service, comme un déplacement.
+describe("couche présentation · reopenContactAction", () => {
+  beforeEach(() => {
+    reopenContact.mockReset();
+    refresh.mockReset();
+  });
+
+  it("passe l'étape choisie au service et rafraîchit la page quand il réussit", async () => {
+    reopenContact.mockResolvedValue({ ok: true, contact: { id: "1", stage: "rdv" } });
+
+    expect(await reopenContactAction("1", "rdv")).toEqual({});
+    expect(reopenContact).toHaveBeenCalledWith("1", "rdv");
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("renvoie l'erreur du service sans rafraîchir", async () => {
+    reopenContact.mockResolvedValue({ ok: false, error: "Ce déplacement n'est pas possible" });
+
+    expect(await reopenContactAction("1", "gagne")).toEqual({ error: "Ce déplacement n'est pas possible" });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("renvoie un message quand la base est en panne", async () => {
+    reopenContact.mockRejectedValue(new Error("SQLITE_BUSY"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await reopenContactAction("1", "rdv")).toEqual({ error: "Impossible de rouvrir le contact, réessaie." });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+// Lot 8 : un dépôt sur le kanban passe par le service, puis la page est rafraîchie.
+describe("couche présentation · dropContactAction (lot 8)", () => {
+  beforeEach(() => {
+    dropContact.mockReset();
+    refresh.mockReset();
+  });
+
+  it("passe la colonne d'arrivée au service et rafraîchit la page quand il réussit", async () => {
+    dropContact.mockResolvedValue({ ok: true, contact: { id: "1", stage: "contacte" } });
+
+    expect(await dropContactAction("1", "contacte")).toEqual({});
+    expect(dropContact).toHaveBeenCalledWith("1", "contacte");
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
+  it("renvoie l'erreur du service sans rafraîchir", async () => {
+    dropContact.mockResolvedValue({ ok: false, error: "Ce déplacement n'est pas possible" });
+
+    expect(await dropContactAction("1", "rdv")).toEqual({ error: "Ce déplacement n'est pas possible" });
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("renvoie un message quand la base est en panne", async () => {
+    dropContact.mockRejectedValue(new Error("SQLITE_BUSY"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await dropContactAction("1", "contacte")).toEqual({ error: "Impossible de déplacer le contact, réessaie." });
     expect(refresh).not.toHaveBeenCalled();
   });
 });

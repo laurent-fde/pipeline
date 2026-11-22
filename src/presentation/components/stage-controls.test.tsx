@@ -70,6 +70,31 @@ describe("couche présentation · StageControls (lot 3)", () => {
     fireEvent.click(button("RDV"));
 
     await vi.waitFor(() => expect(reopenAction).toHaveBeenCalledWith("42", "rdv"));
+    // #17 : après un succès, la liste se referme.
+    await vi.waitFor(() => expect(button("Rouvrir vers…").getAttribute("aria-expanded")).toBe("false"));
+    expect(screen.queryByRole("button", { name: "RDV" })).toBeNull();
+  });
+
+  // #17 : un refus est annoncé, et la liste reste ouverte pour choisir une autre étape.
+  it("annonce l'erreur de « Rouvrir vers… » et garde la liste ouverte", async () => {
+    const reopenAction = vi.fn(async () => ({ error: "Impossible de rouvrir le contact, réessaie." }));
+    render(
+      <StageControls
+        contactId="42"
+        contactName="Claire Martin"
+        moves={{ previous: false, next: false, lost: false }}
+        action={vi.fn()}
+        reopenTargets={[{ stage: "rdv", label: "RDV" }]}
+        reopenAction={reopenAction}
+      />,
+    );
+
+    fireEvent.click(button("Rouvrir vers…"));
+    fireEvent.click(button("RDV"));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Impossible de rouvrir le contact, réessaie.");
+    expect(button("Rouvrir vers…").getAttribute("aria-expanded")).toBe("true");
+    expect(button("RDV")).toBeDefined();
   });
 
   it("n'affiche pas « Rouvrir vers… » sur un contact en cours", () => {
