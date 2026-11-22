@@ -5,6 +5,8 @@ import type { ContactFormState, FollowUpState, MoveState } from "@/presentation/
 import type { Board, BoardColumn, Move, Stage } from "@/services/contact.service";
 import { Badge } from "@/presentation/components/ui/badge";
 import { cn } from "@/presentation/lib/utils";
+import { useSetView } from "./board-toolbar";
+import { Button } from "@/presentation/components/ui/button";
 import { ContactActions } from "./contact-actions";
 import { ContactCard } from "./contact-card";
 import { ContactSheet } from "./contact-sheet";
@@ -155,6 +157,19 @@ function SelectedSheet({
   );
 }
 
+// Lot 10 : une recherche ou un filtre qui ne trouve rien, et le moyen de revenir au tableau complet.
+function NoMatch() {
+  const setView = useSetView();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border p-4">
+      <p className="text-sm text-muted-foreground">Aucun contact ne correspond</p>
+      <Button variant="outline" size="sm" onClick={() => setView({ q: "", filtre: "tous" })}>
+        Effacer la recherche
+      </Button>
+    </div>
+  );
+}
+
 export function KanbanBoard({
   board,
   dropAction,
@@ -176,6 +191,7 @@ export function KanbanBoard({
           Aucun contact pour l&apos;instant. Ajoute ton premier contact avec le bouton « Nouveau contact ».
         </p>
       )}
+      {board.total > 0 && board.visible === 0 && <NoMatch />}
       {/* Six colonnes côte à côte qui se partagent la largeur ; défilement horizontal seulement sur petit écran. */}
       <div className="-mx-4 overflow-x-auto px-4 pb-2">
         {/* Lot 8 : avec un dépôt branché, les cartes se glissent d'une colonne à l'autre par leur poignée. */}

@@ -39,7 +39,32 @@ export type BoardColumn = {
   dropTargets: Stage[];
 };
 
-export type Board = { columns: BoardColumn[]; total: number };
+// Lot 10 : la vue du tableau, venue de l'adresse de la page (?q=…&filtre=…).
+export const FILTERS = ["tous", "a-relancer", "en-attente"] as const;
+export type BoardFilter = (typeof FILTERS)[number];
+export type BoardView = { q: string; filtre: BoardFilter };
+// Ce que le service accepte : des paramètres d'adresse bruts (absents, répétés, invalides). Le schéma décide.
+export type BoardViewInput = { q?: string | string[]; filtre?: string | string[] };
+
+// total : tous les contacts ; visible : ceux qui correspondent à la vue ; count de chaque colonne : ses visibles.
+export type Board = { columns: BoardColumn[]; total: number; visible: number; view: BoardView };
+
+const first = (value: unknown) => (Array.isArray(value) ? value[0] : value);
+const viewSchema = z.object({
+  q: z.preprocess(first, z.string().trim().max(100).catch("")).catch(""),
+  filtre: z.preprocess(first, z.enum(FILTERS).catch("tous")).catch("tous"),
+});
+
+// Minuscules et sans accents : « Éléonore » et « eleonore » se correspondent.
+const normalize = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+function matchesView(contact: BoardContact, view: BoardView): boolean {
+  if (view.filtre === "a-relancer" && contact.followUp !== "overdue" && contact.followUp !== "today") return false;
+  if (view.filtre === "en-attente" && !contact.awaitingReply) return false;
+  if (!view.q) return true;
+  const needle = normalize(view.q);
+  return [contact.name, contact.company, contact.email].some((field) => !!field && normalize(field).includes(needle));
+}
 
 // Lot 9 : les indicateurs du haut de l'écran. winRate en %, null sans contact gagné ni perdu.
 export type Stats = {
@@ -158,13 +183,16 @@ export function createContactService(repository: ContactRepository, now: () => D
     },
 
     // Une colonne par étape, toujours les six, même vides. L'ordre des contacts reçu est conservé.
-    async getBoard(): Promise<Board> {
+    async getBoard(input: BoardViewInput = {}): Promise<Board> {
+      const parsed = viewSchema.safeParse(input);
+      const view: BoardView = parsed.success ? parsed.data : { q: "", filtre: "tous" };
       const today = parisToday(now());
       const contacts = await repository.findAll();
       const columns = STAGES.map(({ id, label }) => {
         const inColumn = contacts
           .filter((contact) => contact.stage === id)
-          .map((contact) => ({ ...contact, followUp: followUpState(contact, today) }));
+          .map((contact) => ({ ...contact, followUp: followUpState(contact, today) }))
+          .filter((contact) => matchesView(contact, view));
         return {
           stage: id,
           label,
@@ -175,7 +203,8 @@ export function createContactService(repository: ContactRepository, now: () => D
           dropTargets: dropTargets(id),
         };
       });
-      return { columns, total: contacts.length };
+      const visible = columns.reduce((sum, column) => sum + column.count, 0);
+      return { columns, total: contacts.length, visible, view };
     },
 
     // Étape suivante, précédente ou Perdu : la règle décide, la couche données enregistre.

@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import type { Contact } from "@/data/contact.repository";
-import { createContactService, STAGES } from "./contact.service";
+import { createContactService, STAGES, type Board } from "./contact.service";
 import { aContact, fakeContactRepository as fakeRepository } from "./testing/fake-contact-repository";
 
 // Des identifiants au format UUID, comme ceux de la vraie base.
@@ -674,5 +674,82 @@ describe("couche service · contact.service · refonte de l'interface (lot 9)", 
     ]);
 
     expect((await service.getStats()).winRate).toBe(33);
+  });
+});
+
+// Lot 10 : rechercher et filtrer le tableau. La correspondance est décidée par le service.
+describe("couche service · contact.service · recherche et filtres (lot 10)", () => {
+  // Le 21 novembre 2026 à 10 h, heure de Paris.
+  const now = () => new Date("2026-11-21T09:00:00Z");
+  const serviceWith = (contacts: Contact[]) => createContactService(fakeRepository(contacts), now);
+  const ID4 = "00000000-0000-4000-8000-000000000004";
+  const ID5 = "00000000-0000-4000-8000-000000000005";
+  const names = (board: Board) => board.columns.flatMap((c) => c.contacts.map((contact) => contact.name)).sort();
+
+  const contacts = [
+    aContact({ id: ID1, name: "Claire Martin", company: "Atelier Lumen", followUpOn: "2026-11-18" }),
+    aContact({ id: ID2, name: "Éléonore Petit", email: "eleonore@lumen.fr", stage: "rdv", followUpOn: "2026-11-21" }),
+    aContact({ id: ID3, name: "Paul Lumen", stage: "proposition", followUpOn: "2026-11-28" }),
+    aContact({ id: ID4, name: "Inès Roy", company: "Studio Nord", followUpOn: "2026-11-15", awaitingReply: true }),
+    aContact({ id: ID5, name: "Marc Blanc", stage: "gagne" }),
+  ];
+
+  // Critère 1 : nom, entreprise ou e-mail, sans tenir compte des majuscules ni des accents.
+  it("trouve « lumen » dans le nom, l'entreprise ou l'e-mail, sans tenir compte des majuscules", async () => {
+    const board = await serviceWith(contacts).getBoard({ q: "LUMEN" });
+
+    expect(names(board)).toEqual(["Claire Martin", "Paul Lumen", "Éléonore Petit"].sort());
+  });
+
+  it("trouve « eleonore » dans « Éléonore », et l'inverse", async () => {
+    expect(names(await serviceWith(contacts).getBoard({ q: "eleonore" }))).toEqual(["Éléonore Petit"]);
+    expect(names(await serviceWith(contacts).getBoard({ q: "  Inès " }))).toEqual(["Inès Roy"]);
+  });
+
+  // Critère 2 : les filtres.
+  it("« À relancer » garde les relances en retard ou d'aujourd'hui, pas celles à venir ni en attente", async () => {
+    const board = await serviceWith(contacts).getBoard({ filtre: "a-relancer" });
+
+    expect(names(board)).toEqual(["Claire Martin", "Éléonore Petit"].sort());
+  });
+
+  it("« En attente de réponse » garde les contacts dont la relance est faite", async () => {
+    expect(names(await serviceWith(contacts).getBoard({ filtre: "en-attente" }))).toEqual(["Inès Roy"]);
+  });
+
+  it("« Tous » (ou aucun filtre) garde tout le monde", async () => {
+    expect(names(await serviceWith(contacts).getBoard({ filtre: "tous" }))).toHaveLength(5);
+    expect(names(await serviceWith(contacts).getBoard())).toHaveLength(5);
+  });
+
+  // Critère 3 : recherche et filtre ensemble ; chaque colonne compte ses contacts visibles.
+  it("combine recherche et filtre, et compte les contacts visibles de chaque colonne", async () => {
+    const board = await serviceWith(contacts).getBoard({ q: "lumen", filtre: "a-relancer" });
+
+    expect(names(board)).toEqual(["Claire Martin", "Éléonore Petit"].sort());
+    const count = (stage: string) => board.columns.find((c) => c.stage === stage)?.count;
+    expect(count("nouveau")).toBe(1);
+    expect(count("rdv")).toBe(1);
+    expect(count("proposition")).toBe(0);
+    expect(board.visible).toBe(2);
+    expect(board.total).toBe(5);
+  });
+
+  // Critère 5 : la vue vient de l'adresse de la page ; une valeur invalide est ignorée, sans erreur.
+  it("renvoie la vue appliquée, et ignore un filtre inconnu ou une recherche démesurée", async () => {
+    const service = serviceWith(contacts);
+
+    expect((await service.getBoard({ q: " lumen ", filtre: "en-attente" })).view).toEqual({ q: "lumen", filtre: "en-attente" });
+
+    const invalid = await service.getBoard({ q: "x".repeat(101), filtre: "n-importe-quoi" });
+    expect(invalid.view).toEqual({ q: "", filtre: "tous" });
+    expect(invalid.visible).toBe(5);
+  });
+
+  it("accepte les paramètres d'adresse répétés en gardant le premier", async () => {
+    const board = await serviceWith(contacts).getBoard({ q: ["inès", "claire"], filtre: ["en-attente", "tous"] });
+
+    expect(board.view).toEqual({ q: "inès", filtre: "en-attente" });
+    expect(names(board)).toEqual(["Inès Roy"]);
   });
 });

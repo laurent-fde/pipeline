@@ -4,6 +4,10 @@ import type { Board, BoardContact } from "@/services/contact.service";
 import { allowedMoves, dropTargets, reopenTargets } from "@/services/stages";
 import { KanbanBoard } from "./kanban-board";
 
+// Lot 10 : « Effacer la recherche » change l'adresse de la page.
+const { replace } = vi.hoisted(() => ({ replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace }), usePathname: () => "/" }));
+
 afterEach(cleanup);
 
 const LABELS = [
@@ -28,7 +32,7 @@ const contact = (id: string, name: string, stage: string): BoardContact => ({
   followUp: null,
 });
 
-function board(contacts: BoardContact[]): Board {
+function board(contacts: BoardContact[], view: Board["view"] = { q: "", filtre: "tous" }, total = contacts.length): Board {
   const columns = LABELS.map(([stage, label]) => {
     const inColumn = contacts.filter((c) => c.stage === stage);
     // Les vraies règles de stages.ts, pour que la fixture ne dérive plus du service (#16).
@@ -42,7 +46,7 @@ function board(contacts: BoardContact[]): Board {
       dropTargets: dropTargets(stage),
     };
   });
-  return { columns, total: contacts.length };
+  return { columns, total, visible: contacts.length, view };
 }
 
 const column = (label: string) => screen.getByRole("region", { name: label });
@@ -362,5 +366,41 @@ describe("couche présentation · KanbanBoard · erreur du bouton « étape suiv
     await vi.waitFor(() =>
       expect(within(card("Claire Martin")).getByRole("status").textContent).toBe("Impossible de déplacer le contact, réessaie."),
     );
+  });
+});
+
+// Lot 10 : tableau filtré.
+describe("couche présentation · KanbanBoard · recherche et filtres (lot 10)", () => {
+  // Critère 4 : rien ne correspond → un message et un bouton qui remet le tableau complet.
+  it("annonce qu'aucun contact ne correspond, et « Effacer la recherche » remet le tableau complet", () => {
+    replace.mockClear();
+    render(<KanbanBoard board={board([], { q: "zzz", filtre: "a-relancer" }, 3)} />);
+
+    expect(screen.getByText("Aucun contact ne correspond")).toBeDefined();
+    expect(screen.queryByText(/ajoute ton premier contact/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Effacer la recherche" }));
+    expect(replace).toHaveBeenCalledWith("/", { scroll: false });
+  });
+
+  it("n'annonce rien quand le tableau filtré a des contacts", () => {
+    render(<KanbanBoard board={board([contact("1", "Claire Martin", "nouveau")], { q: "claire", filtre: "tous" }, 3)} />);
+
+    expect(screen.queryByText("Aucun contact ne correspond")).toBeNull();
+  });
+
+  // Critère 6 : sur un tableau filtré, le glisser-déposer et la fiche fonctionnent.
+  it("garde le glisser-déposer et la fiche sur un tableau filtré", async () => {
+    const dropAction = vi.fn(async () => ({}));
+    const filtered = board([contact("1", "Claire Martin", "nouveau")], { q: "claire", filtre: "tous" }, 3);
+    render(<KanbanBoard board={filtered} moveAction={vi.fn()} dropAction={dropAction} />);
+    const dataTransfer = { setData: vi.fn(), getData: vi.fn(), setDragImage: vi.fn(), effectAllowed: "", dropEffect: "" };
+
+    fireEvent.dragStart(within(card("Claire Martin")).getByTitle("Glisser Claire Martin vers une autre colonne"), { dataTransfer });
+    fireEvent.drop(column("Contacté"), { dataTransfer });
+    await vi.waitFor(() => expect(dropAction).toHaveBeenCalledWith("1", "contacte"));
+
+    openSheet("Claire Martin");
+    expect(screen.getByRole("dialog", { name: "Claire Martin" })).toBeDefined();
   });
 });

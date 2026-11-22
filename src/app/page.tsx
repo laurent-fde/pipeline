@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { getContactService } from "@/services/contact.service";
+import { getContactService, type BoardViewInput } from "@/services/contact.service";
 import {
   addContactAction,
   deleteContactAction,
@@ -11,6 +11,7 @@ import {
   setFollowUpAction,
   updateContactAction,
 } from "@/presentation/actions/contact.action";
+import { BoardToolbar } from "@/presentation/components/board-toolbar";
 import { FollowUpList } from "@/presentation/components/follow-up-list";
 import { KanbanBoard } from "@/presentation/components/kanban-board";
 import { NewContactDialog } from "@/presentation/components/new-contact-dialog";
@@ -18,11 +19,14 @@ import { StatsBar } from "@/presentation/components/stats-bar";
 import { ThemeToggle } from "@/presentation/components/theme-toggle";
 
 // Lu à chaque requête : le tableau reflète toujours la base.
-async function Board() {
+// Lot 10 : la recherche et le filtre viennent de l'adresse ; le service les valide et filtre.
+async function Board({ searchParams }: { searchParams: Promise<BoardViewInput> }) {
   await connection();
-  const board = await getContactService().getBoard();
+  const board = await getContactService().getBoard(await searchParams);
   return (
-    <KanbanBoard
+    <div className="grid gap-3">
+      <BoardToolbar view={board.view} />
+      <KanbanBoard
       board={board}
       moveAction={moveContactAction}
       reopenAction={reopenContactAction}
@@ -30,7 +34,8 @@ async function Board() {
       updateAction={updateContactAction}
       deleteAction={deleteContactAction}
       dropAction={dropContactAction}
-    />
+      />
+    </div>
   );
 }
 
@@ -46,7 +51,7 @@ async function FollowUps() {
   return <FollowUpList followUps={followUps} doneAction={markFollowUpDoneAction} />;
 }
 
-export default function Home() {
+export default function Home({ searchParams }: { searchParams: Promise<BoardViewInput> }) {
   return (
     <>
       {/* Lot 9 : barre du haut, toujours visible. */}
@@ -84,7 +89,7 @@ export default function Home() {
             Tableau
           </h2>
           <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement du tableau…</p>}>
-            <Board />
+            <Board searchParams={searchParams} />
           </Suspense>
         </section>
       </main>

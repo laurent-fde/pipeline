@@ -114,3 +114,22 @@ L'écran devient plus lisible : une barre du haut, des indicateurs, des cartes c
   → `kanban-board.test.tsx` « ne rend déplaçable que la poignée… », « éteint la mise en évidence au survol… ».
 - [x] Étant donné le thème clair ou sombre, quand j'utilise l'écran, alors tout est lisible et rien n'est coupé, sur grand écran comme sur téléphone.
   → vérifié dans le navigateur en clair et en sombre (tableau, fiche, fenêtre d'ajout) sur grand écran (1440 px) et à largeur de téléphone (390 px) : pas de défilement horizontal de la page, seul le tableau défile.
+
+## Lot 10 · Rechercher et filtrer les contacts
+
+Au-dessus du tableau, je cherche un contact par son nom, son entreprise ou son e-mail, et je filtre le tableau pour ne voir que les contacts à relancer ou en attente de réponse. D'après la maquette du lot 9. Le service décide quels contacts correspondent ; la recherche et le filtre sont gardés dans l'adresse de la page.
+
+- [x] Étant donné des contacts, quand je tape « lumen » dans « Rechercher un contact », alors le tableau ne montre que les contacts dont le nom, l'entreprise ou l'e-mail contient « lumen », sans tenir compte des majuscules ni des accents (« eleonore » trouve « Éléonore »).
+  → `contact.service.test.ts` « trouve « lumen » dans le nom, l'entreprise ou l'e-mail… », « trouve « eleonore » dans « Éléonore »… » ; `board-toolbar.test.tsx` « met la recherche dans l'adresse de la page ».
+- [x] Étant donné les filtres « Tous », « À relancer » et « En attente de réponse », quand je choisis « À relancer », alors seuls les contacts dont la relance est en retard ou aujourd'hui restent ; « En attente de réponse » garde ceux dont la relance est faite ; « Tous » enlève le filtre.
+  → `contact.service.test.ts` « « À relancer » garde… », « « En attente de réponse » garde… », « « Tous » (ou aucun filtre)… » ; `board-toolbar.test.tsx` « marque le filtre actif… », « « Tous » retire le filtre… ».
+- [x] Étant donné une recherche et un filtre, quand les deux sont actifs, alors seuls les contacts qui répondent aux deux restent, et le nombre affiché sur chaque colonne compte les contacts visibles.
+  → `contact.service.test.ts` « combine recherche et filtre, et compte les contacts visibles de chaque colonne ».
+- [x] Étant donné une recherche qui ne trouve rien, quand je regarde le tableau, alors « Aucun contact ne correspond » s'affiche avec un bouton « Effacer la recherche » qui remet le tableau complet.
+  → `kanban-board.test.tsx` « annonce qu'aucun contact ne correspond… » ; `board-toolbar.test.tsx` « vide le champ quand la recherche est effacée ailleurs ».
+- [x] Étant donné une recherche ou un filtre actif, quand je recharge la page ou partage son adresse, alors la même recherche et le même filtre sont appliqués.
+  → `contact.service.test.ts` « renvoie la vue appliquée, et ignore un filtre inconnu… », « accepte les paramètres d'adresse répétés… » ; `board-toolbar.test.tsx` « reprend la recherche et le filtre de l'adresse » ; vérifié dans le navigateur (rechargement de `?q=zzz&filtre=en-attente`).
+- [x] Étant donné un tableau filtré, quand je glisse une carte ou ouvre une fiche, alors tout fonctionne comme sur le tableau complet (lots 8 et 9).
+  → `kanban-board.test.tsx` « garde le glisser-déposer et la fiche sur un tableau filtré ».
+- [ ] Étant donné le thème clair ou sombre, quand j'utilise la recherche et les filtres, alors tout est lisible et rien n'est coupé, sur grand écran comme sur téléphone.
+  → vérifié dans le navigateur en clair et en sombre sur grand écran (1440 px). Largeur téléphone non vérifiée : les en-têtes anti-cadre (#33) et le blocage des fenêtres empêchent de simuler 390 px ; à vérifier sur un téléphone.
