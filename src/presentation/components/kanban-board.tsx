@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import type { ContactFormState, FollowUpState, MoveState } from "@/presentation/actions/contact.action";
-import type { Board, BoardColumn, Move, Stage } from "@/services/contact.service";
+import type { Board, BoardColumn, BoardContact, Move, Stage } from "@/services/contact.service";
 import { Badge } from "@/presentation/components/ui/badge";
 import { cn } from "@/presentation/lib/utils";
+import { useBoardView } from "./board-toolbar";
+import { Button } from "@/presentation/components/ui/button";
 import { ContactActions } from "./contact-actions";
 import { ContactCard } from "./contact-card";
 import { ContactSheet } from "./contact-sheet";
@@ -123,16 +125,36 @@ function SelectedSheet({
   deleteAction,
 }: { board: Board; selectedId: string | null; onClose: () => void } & CardActions) {
   const column = board.columns.find((c) => c.contacts.some((contact) => contact.id === selectedId));
-  const contact = column?.contacts.find((c) => c.id === selectedId);
-  if (!column || !contact) return null;
+  const found = column?.contacts.find((c) => c.id === selectedId);
+
+  // Revue du lot 10 : un contact qui sort de la recherche ou du filtre (relance faite, nom modifié…) garde
+  // sa fiche ouverte, sur son dernier état connu, sans les actions qui agiraient sur un état périmé.
+  const [last, setLast] = useState<{ contact: BoardContact; label: string } | null>(null);
+  const current = found && column ? { contact: found, label: column.label } : null;
+  if (current && (current.contact !== last?.contact || current.label !== last?.label)) setLast(current);
+  if (!selectedId && last) setLast(null);
+  const shown = current ?? (last && last.contact.id === selectedId ? last : null);
+  if (!selectedId || !shown) return null;
+  const { contact } = shown;
+  const live = !!found && !!column;
+
+  // Après une suppression réussie depuis la fiche, elle se referme.
+  const removeAndClose: DeleteAction = async (id) => {
+    const result = await deleteAction!(id);
+    if (!result?.error) onClose();
+    return result;
+  };
 
   return (
     <ContactSheet
       contact={contact}
-      stageLabel={column.label}
+      stageLabel={shown.label}
       open
       onOpenChange={(open) => !open && onClose()}
+      notice={live ? undefined : "Ce contact ne correspond plus à la recherche ou au filtre."}
       stage={
+        live &&
+        column &&
         moveAction && (
           <StageControls
             contactId={contact.id}
@@ -145,13 +167,28 @@ function SelectedSheet({
         )
       }
       followUp={
+        live &&
         followUpAction && <FollowUpForm contactId={contact.id} followUpOn={contact.followUpOn} action={followUpAction} />
       }
       actions={
+        live &&
         updateAction &&
-        deleteAction && <ContactActions contact={contact} updateAction={updateAction} deleteAction={deleteAction} />
+        deleteAction && <ContactActions contact={contact} updateAction={updateAction} deleteAction={removeAndClose} />
       }
     />
+  );
+}
+
+// Lot 10 : une recherche ou un filtre qui ne trouve rien, et le moyen de revenir au tableau complet.
+function NoMatch() {
+  const { clear } = useBoardView();
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border p-4">
+      <p className="text-sm text-muted-foreground">Aucun contact ne correspond</p>
+      <Button variant="outline" size="sm" onClick={clear}>
+        Effacer la recherche
+      </Button>
+    </div>
   );
 }
 
@@ -176,6 +213,7 @@ export function KanbanBoard({
           Aucun contact pour l&apos;instant. Ajoute ton premier contact avec le bouton « Nouveau contact ».
         </p>
       )}
+      {board.total > 0 && board.visible === 0 && <NoMatch />}
       {/* Six colonnes côte à côte qui se partagent la largeur ; défilement horizontal seulement sur petit écran. */}
       <div className="-mx-4 overflow-x-auto px-4 pb-2">
         {/* Lot 8 : avec un dépôt branché, les cartes se glissent d'une colonne à l'autre par leur poignée. */}
