@@ -49,6 +49,21 @@ describe("couche présentation · ContactForm", () => {
     expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Claire");
   });
 
+  // Longueurs maximales (#20) : l'erreur d'Entreprise ou de Téléphone s'affiche aussi, reliée au champ.
+  it.each([
+    ["company", "Entreprise", "L'entreprise est trop longue (200 caractères maximum)"],
+    ["phone", "Téléphone", "Le téléphone est trop long (30 caractères maximum)"],
+  ] as const)("affiche l'erreur du champ %s reliée au champ %s", async (field, label, error) => {
+    renderWithResponse({ errors: { [field]: error }, values: { name: "Claire", [field]: "trop long" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter le contact" }));
+
+    const message = await screen.findByText(error);
+    const champ = screen.getByLabelText(label);
+    expect(champ.getAttribute("aria-invalid")).toBe("true");
+    expect(champ.getAttribute("aria-describedby")).toBe(message.id);
+  });
+
   it("affiche « Ajout en cours… » pendant l'envoi, puis revient au libellé normal", async () => {
     let terminer!: (state: ContactFormState) => void;
     const action = vi.fn(() => new Promise<ContactFormState>((resolve) => (terminer = resolve)));

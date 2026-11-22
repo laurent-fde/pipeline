@@ -34,7 +34,7 @@ export type BoardColumn = {
 
 export type Board = { columns: BoardColumn[]; total: number };
 
-export type ContactErrors = { name?: string; email?: string };
+export type ContactErrors = { name?: string; company?: string; email?: string; phone?: string };
 
 export type UpdateContactResult =
   | { ok: true; contact: Contact }
@@ -59,15 +59,23 @@ const followUpSchema = z.object({ date: z.iso.date({ error: "La date n'est pas v
 
 export type AddContactResult = { ok: true; contact: Contact } | { ok: false; errors: ContactErrors };
 
-// Texte facultatif : espaces retirés, vide ou absent enregistré comme null.
-const optionalText = z.string().trim().optional().transform((value) => value || null);
+// Texte facultatif : espaces retirés, longueur maximale, vide ou absent enregistré comme null.
+const optionalText = (max: number, error: string) =>
+  z.string().trim().max(max, { error }).optional().transform((value) => value || null);
 
 // Règles métier d'un contact, en un seul schéma : réutilisé pour l'ajout (lot 1) et la modification (lot 6).
+// Longueurs maximales : une action serveur peut être appelée sans l'écran, avec des champs démesurés.
 export const contactSchema = z.object({
-  name: z.string({ error: "Le nom est obligatoire" }).trim().min(1, { error: "Le nom est obligatoire" }),
-  company: optionalText,
-  email: optionalText.pipe(z.email({ error: "L'e-mail n'est pas valide" }).nullable()),
-  phone: optionalText,
+  name: z
+    .string({ error: "Le nom est obligatoire" })
+    .trim()
+    .min(1, { error: "Le nom est obligatoire" })
+    .max(200, { error: "Le nom est trop long (200 caractères maximum)" }),
+  company: optionalText(200, "L'entreprise est trop longue (200 caractères maximum)"),
+  email: optionalText(254, "L'e-mail est trop long (254 caractères maximum)").pipe(
+    z.email({ error: "L'e-mail n'est pas valide" }).nullable(),
+  ),
+  phone: optionalText(30, "Le téléphone est trop long (30 caractères maximum)"),
 });
 
 // Ce que le service accepte de recevoir : tout est facultatif, c'est le schéma qui décide.
@@ -83,7 +91,9 @@ export function validateContactInput(
   const { fieldErrors } = z.flattenError(result.error);
   const errors: ContactErrors = {};
   if (fieldErrors.name) errors.name = fieldErrors.name[0];
+  if (fieldErrors.company) errors.company = fieldErrors.company[0];
   if (fieldErrors.email) errors.email = fieldErrors.email[0];
+  if (fieldErrors.phone) errors.phone = fieldErrors.phone[0];
   return { ok: false, errors };
 }
 
