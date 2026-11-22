@@ -4,6 +4,10 @@ import type { Contact } from "@/data/contact.repository";
 import { createContactService, STAGES } from "./contact.service";
 import { aContact, fakeContactRepository as fakeRepository } from "./testing/fake-contact-repository";
 
+// Un e-mail bien formé de la longueur voulue (entre 200 et 260) : « claire@ » + 4 parties de domaine + « .fr ».
+const emailOfLength = (length: number) =>
+  `claire@${"b".repeat(60)}.${"c".repeat(60)}.${"d".repeat(60)}.${"e".repeat(length - 193)}.fr`;
+
 describe("couche service · contact.service", () => {
   // Critère 1 : je saisis un nom et je valide, le contact apparaît avec ses informations.
   it("enregistre un contact valide et le renvoie dans la liste avec ses informations", async () => {
@@ -66,6 +70,45 @@ describe("couche service · contact.service", () => {
       expect(repository.insert).not.toHaveBeenCalled();
     },
   );
+
+  // Une action serveur peut être appelée sans l'écran : chaque champ a une longueur maximale.
+  it.each([
+    ["name", 200, "Le nom est trop long (200 caractères maximum)"],
+    ["company", 200, "L'entreprise est trop longue (200 caractères maximum)"],
+    ["phone", 30, "Le téléphone est trop long (30 caractères maximum)"],
+  ] as const)("refuse un champ %s de plus de %i caractères sans rien enregistrer", async (field, max, message) => {
+    const repository = fakeRepository();
+    const service = createContactService(repository);
+
+    const result = await service.addContact({ name: "Claire", [field]: "a".repeat(max + 1) });
+
+    expect(result).toEqual({ ok: false, errors: { [field]: message } });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it("refuse un e-mail de plus de 254 caractères sans rien enregistrer", async () => {
+    const repository = fakeRepository();
+    const service = createContactService(repository);
+    const email = emailOfLength(255);
+
+    const result = await service.addContact({ name: "Claire", email });
+
+    expect(result).toEqual({ ok: false, errors: { email: "L'e-mail est trop long (254 caractères maximum)" } });
+    expect(repository.insert).not.toHaveBeenCalled();
+  });
+
+  it("accepte chaque champ à sa longueur maximale exacte", async () => {
+    const service = createContactService(fakeRepository());
+
+    const result = await service.addContact({
+      name: "a".repeat(200),
+      company: "b".repeat(200),
+      email: emailOfLength(254),
+      phone: "0".repeat(30),
+    });
+
+    expect(result.ok).toBe(true);
+  });
 
   it("signale toutes les erreurs à la fois", async () => {
     const service = createContactService(fakeRepository());

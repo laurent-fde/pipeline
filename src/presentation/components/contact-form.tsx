@@ -31,7 +31,7 @@ type FieldProps = {
 
 function Field({ name, label, type = "text", autoComplete, state, initialValues, idPrefix, required }: FieldProps) {
   const id = `${idPrefix}-${name}`;
-  const error = name === "name" || name === "email" ? state.errors?.[name] : undefined;
+  const error = state.errors?.[name];
   const errorId = `${id}-error`;
 
   return (
