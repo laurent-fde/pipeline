@@ -167,8 +167,6 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
     ["contacte", "nouveau"],
     ["rdv", "contacte"],
     ["proposition", "rdv"],
-    ["gagne", "proposition"],
-    ["perdu", "gagne"],
   ])("ramène un contact de %s à %s", async (from, to) => {
     const { service } = serviceWith(from);
 
@@ -177,8 +175,8 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
   });
 
-  it("refuse « Étape précédente » depuis Nouveau, sans rien enregistrer", async () => {
-    const { repository, service } = serviceWith("nouveau");
+  it.each(["nouveau", "gagne", "perdu"])("refuse « Étape précédente » depuis %s, sans rien enregistrer", async (from) => {
+    const { repository, service } = serviceWith(from);
 
     const result = await service.moveContact("1", "previous");
 
@@ -213,9 +211,62 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
       contacte: { previous: true, next: true, lost: true },
       rdv: { previous: true, next: true, lost: true },
       proposition: { previous: true, next: true, lost: true },
-      gagne: { previous: true, next: false, lost: true },
-      perdu: { previous: true, next: false, lost: false },
+      gagne: { previous: false, next: false, lost: true },
+      perdu: { previous: false, next: false, lost: false },
     });
+  });
+
+  // Remarque sur #3 : un contact Gagné ou Perdu peut être rouvert, à une étape choisie à la main.
+  it("propose de rouvrir vers Nouveau, Contacté, RDV ou Proposition, seulement depuis Gagné ou Perdu", async () => {
+    const board = await createContactService(fakeRepository()).getBoard();
+    const open = [
+      { stage: "nouveau", label: "Nouveau" },
+      { stage: "contacte", label: "Contacté" },
+      { stage: "rdv", label: "RDV" },
+      { stage: "proposition", label: "Proposition" },
+    ];
+
+    expect(Object.fromEntries(board.columns.map((c) => [c.stage, c.reopenTargets]))).toEqual({
+      nouveau: [],
+      contacte: [],
+      rdv: [],
+      proposition: [],
+      gagne: open,
+      perdu: open,
+    });
+  });
+
+  it.each([
+    ["perdu", "rdv"],
+    ["perdu", "nouveau"],
+    ["gagne", "proposition"],
+  ])("rouvre un contact de %s vers %s", async (from, to) => {
+    const { repository, service } = serviceWith(from);
+
+    const result = await service.reopenContact("1", to as never);
+
+    expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
+    expect(repository.updateStage).toHaveBeenCalledWith("1", to);
+  });
+
+  it.each([
+    ["rdv", "nouveau"],
+    ["perdu", "gagne"],
+    ["gagne", "perdu"],
+    ["perdu", "inconnue"],
+  ])("refuse de rouvrir un contact de %s vers %s, sans rien enregistrer", async (from, to) => {
+    const { repository, service } = serviceWith(from);
+
+    const result = await service.reopenContact("1", to as never);
+
+    expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
+    expect(repository.updateStage).not.toHaveBeenCalled();
+  });
+
+  it("refuse de rouvrir un contact inconnu", async () => {
+    const { service } = serviceWith("perdu");
+
+    expect(await service.reopenContact("inconnu", "rdv")).toEqual({ ok: false, error: "Contact introuvable" });
   });
 
   it("refuse un contact inconnu ou un déplacement inconnu", async () => {

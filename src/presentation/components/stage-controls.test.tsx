@@ -47,6 +47,37 @@ describe("couche présentation · StageControls (lot 3)", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("Impossible de déplacer le contact, réessaie.");
   });
 
+  // Remarque sur #3 : « Rouvrir vers… » déplie les étapes proposées, un clic rouvre le contact.
+  it("rouvre un contact Gagné ou Perdu vers l'étape choisie", async () => {
+    const reopenAction = vi.fn(async () => ({}));
+    render(
+      <StageControls
+        contactId="42"
+        contactName="Claire Martin"
+        moves={{ previous: false, next: false, lost: false }}
+        action={vi.fn()}
+        reopenTargets={[
+          { stage: "nouveau", label: "Nouveau" },
+          { stage: "rdv", label: "RDV" },
+        ]}
+        reopenAction={reopenAction}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "RDV" })).toBeNull();
+    fireEvent.click(button("Rouvrir vers…"));
+    expect(button("Rouvrir vers…").getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(button("RDV"));
+
+    await vi.waitFor(() => expect(reopenAction).toHaveBeenCalledWith("42", "rdv"));
+  });
+
+  it("n'affiche pas « Rouvrir vers… » sur un contact en cours", () => {
+    render(<StageControls contactId="42" contactName="Claire Martin" moves={allMoves} action={vi.fn()} />);
+
+    expect(screen.queryByRole("button", { name: "Rouvrir vers…" })).toBeNull();
+  });
+
   it("nomme le groupe de boutons avec le contact concerné", () => {
     render(<StageControls contactId="42" contactName="Claire Martin" moves={allMoves} action={vi.fn()} />);
 

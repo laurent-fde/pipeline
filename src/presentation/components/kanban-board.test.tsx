@@ -30,7 +30,7 @@ function board(contacts: Contact[]): Board {
   const columns = LABELS.map(([stage, label]) => {
     const inColumn = contacts.filter((c) => c.stage === stage);
     const moves = { previous: stage !== "nouveau", next: stage !== "gagne" && stage !== "perdu", lost: stage !== "perdu" };
-    return { stage, label, count: inColumn.length, contacts: inColumn, moves };
+    return { stage, label, count: inColumn.length, contacts: inColumn, moves, reopenTargets: [] };
   });
   return { columns, total: contacts.length };
 }

@@ -6,13 +6,31 @@ import {
 } from "@/data/contact.repository";
 import { z } from "zod";
 import { parisToday } from "./today";
-import { allowedMoves, FIRST_STAGE, MOVES, STAGES, targetStage, type AllowedMoves, type Move, type Stage } from "./stages";
+import {
+  allowedMoves,
+  FIRST_STAGE,
+  MOVES,
+  reopenTargets,
+  STAGES,
+  targetStage,
+  type AllowedMoves,
+  type Move,
+  type ReopenTarget,
+  type Stage,
+} from "./stages";
 
 export type { Contact };
 
-export { STAGES, type Move, type Stage } from "./stages";
+export { STAGES, type Move, type ReopenTarget, type Stage } from "./stages";
 
-export type BoardColumn = { stage: Stage; label: string; count: number; contacts: Contact[]; moves: AllowedMoves };
+export type BoardColumn = {
+  stage: Stage;
+  label: string;
+  count: number;
+  contacts: Contact[];
+  moves: AllowedMoves;
+  reopenTargets: ReopenTarget[];
+};
 
 export type Board = { columns: BoardColumn[]; total: number };
 
@@ -27,6 +45,8 @@ export type DeleteContactResult = { ok: true } | { ok: false; error: string };
 export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: string };
 
 const moveSchema = z.enum(MOVES);
+
+const stageSchema = z.enum(STAGES.map((stage) => stage.id));
 
 export type FollowUpInput = { date?: string };
 
@@ -98,7 +118,14 @@ export function createContactService(repository: ContactRepository, now: () => D
       const contacts = await repository.findAll();
       const columns = STAGES.map(({ id, label }) => {
         const inColumn = contacts.filter((contact) => contact.stage === id);
-        return { stage: id, label, count: inColumn.length, contacts: inColumn, moves: allowedMoves(id) };
+        return {
+          stage: id,
+          label,
+          count: inColumn.length,
+          contacts: inColumn,
+          moves: allowedMoves(id),
+          reopenTargets: reopenTargets(id),
+        };
       });
       return { columns, total: contacts.length };
     },
@@ -115,6 +142,22 @@ export function createContactService(repository: ContactRepository, now: () => D
       if (!stage) return { ok: false, error: "Ce déplacement n'est pas possible" };
 
       const moved = await repository.updateStage(id, stage);
+      return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
+    },
+
+    // Rouvrir un contact Gagné ou Perdu, vers une étape en cours choisie à la main.
+    async reopenContact(id: string, stage: Stage): Promise<MoveResult> {
+      const parsedStage = stageSchema.safeParse(stage);
+      if (!parsedStage.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: "Contact introuvable" };
+
+      if (!reopenTargets(contact.stage).some((target) => target.stage === parsedStage.data)) {
+        return { ok: false, error: "Ce déplacement n'est pas possible" };
+      }
+
+      const moved = await repository.updateStage(id, parsedStage.data);
       return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
     },
 

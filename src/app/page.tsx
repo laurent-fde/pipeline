@@ -6,6 +6,7 @@ import {
   deleteContactAction,
   markFollowUpDoneAction,
   moveContactAction,
+  reopenContactAction,
   setFollowUpAction,
   updateContactAction,
 } from "@/presentation/actions/contact.action";
@@ -22,6 +23,7 @@ async function Board() {
     <KanbanBoard
       board={board}
       moveAction={moveContactAction}
+      reopenAction={reopenContactAction}
       followUpAction={setFollowUpAction}
       updateAction={updateContactAction}
       deleteAction={deleteContactAction}

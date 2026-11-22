@@ -1,7 +1,7 @@
 "use server";
 
 import { refresh } from "next/cache";
-import { getContactService, type ContactErrors, type ContactInput, type Move } from "@/services/contact.service";
+import { getContactService, type ContactErrors, type ContactInput, type Move, type Stage } from "@/services/contact.service";
 
 export type ContactFormState = {
   errors?: ContactErrors;
@@ -79,6 +79,20 @@ export async function moveContactAction(id: string, move: Move): Promise<MoveSta
   } catch (error) {
     console.error("moveContactAction", error);
     return { error: "Impossible de déplacer le contact, réessaie." };
+  }
+  if (!result.ok) return { error: result.error };
+
+  refresh();
+  return {};
+}
+
+export async function reopenContactAction(id: string, stage: Stage): Promise<MoveState> {
+  let result;
+  try {
+    result = await getContactService().reopenContact(id, stage);
+  } catch (error) {
+    console.error("reopenContactAction", error);
+    return { error: "Impossible de rouvrir le contact, réessaie." };
   }
   if (!result.ok) return { error: result.error };
 
