@@ -46,6 +46,11 @@ export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: st
 
 const moveSchema = z.enum(MOVES);
 
+// L'identifiant d'un contact vient du navigateur : la base n'en crée qu'au format UUID.
+const idSchema = z.uuid();
+const isContactId = (id: unknown): id is string => idSchema.safeParse(id).success;
+const NOT_FOUND = "Contact introuvable";
+
 const stageSchema = z.enum(STAGES.map((stage) => stage.id));
 
 export type FollowUpInput = { date?: string };
@@ -109,6 +114,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Mêmes règles qu'à l'ajout ; l'étape et la relance ne changent pas.
     async updateContact(id: string, input: ContactInput): Promise<UpdateContactResult> {
+      if (!isContactId(id)) return { ok: false, errors: {}, error: NOT_FOUND };
       const result = validateContactInput(input);
       if (!result.ok) return result;
       const contact = await repository.update(id, result.value);
@@ -116,6 +122,7 @@ export function createContactService(repository: ContactRepository, now: () => D
     },
 
     async deleteContact(id: string): Promise<DeleteContactResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       return (await repository.delete(id)) ? { ok: true } : { ok: false, error: "Contact introuvable" };
     },
 
@@ -142,6 +149,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Étape suivante, précédente ou Perdu : la règle décide, la couche données enregistre.
     async moveContact(id: string, move: Move): Promise<MoveResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const parsedMove = moveSchema.safeParse(move);
       if (!parsedMove.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
 
@@ -157,6 +165,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Rouvrir un contact Gagné ou Perdu, vers une étape en cours choisie à la main.
     async reopenContact(id: string, stage: Stage): Promise<MoveResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const parsedStage = stageSchema.safeParse(stage);
       if (!parsedStage.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
 
@@ -172,6 +181,7 @@ export function createContactService(repository: ContactRepository, now: () => D
     },
 
     async setFollowUp(id: string, input: FollowUpInput): Promise<FollowUpResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const parsed = followUpSchema.safeParse(input);
       if (!parsed.success) return { ok: false, error: "La date n'est pas valide" };
 
@@ -182,6 +192,7 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Relance faite : le contact attend une réponse, garde sa date et reste dans sa colonne.
     async markFollowUpDone(id: string): Promise<FollowUpResult> {
+      if (!isContactId(id)) return { ok: false, error: NOT_FOUND };
       const contact = await repository.findById(id);
       if (!contact) return { ok: false, error: "Contact introuvable" };
       if (!contact.followUpOn) return { ok: false, error: "Aucune relance à marquer comme faite" };

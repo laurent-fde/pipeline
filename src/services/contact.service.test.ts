@@ -4,6 +4,11 @@ import type { Contact } from "@/data/contact.repository";
 import { createContactService, STAGES } from "./contact.service";
 import { aContact, fakeContactRepository as fakeRepository } from "./testing/fake-contact-repository";
 
+// Des identifiants au format UUID, comme ceux de la vraie base.
+const ID1 = "00000000-0000-4000-8000-000000000001";
+const ID2 = "00000000-0000-4000-8000-000000000002";
+const ID3 = "00000000-0000-4000-8000-000000000003";
+
 // Un e-mail bien formé de la longueur voulue (entre 200 et 260) : « claire@ » + 4 parties de domaine + « .fr ».
 const emailOfLength = (length: number) =>
   `claire@${"b".repeat(60)}.${"c".repeat(60)}.${"d".repeat(60)}.${"e".repeat(length - 193)}.fr`;
@@ -158,7 +163,7 @@ describe("couche service · contact.service · tableau kanban (lot 2)", () => {
   // Critère 3 : chaque colonne indique son nombre de contacts.
   it("compte les contacts de chaque colonne", async () => {
     const service = createContactService(
-      fakeRepository([contact("1", "nouveau"), contact("2", "rdv"), contact("3", "nouveau")]),
+      fakeRepository([contact(ID1, "nouveau"), contact(ID2, "rdv"), contact(ID3, "nouveau")]),
     );
 
     const board = await service.getBoard();
@@ -171,7 +176,7 @@ describe("couche service · contact.service · tableau kanban (lot 2)", () => {
       gagne: 0,
       perdu: 0,
     });
-    expect(board.columns[0].contacts.map((c) => c.id)).toEqual(["1", "3"]);
+    expect(board.columns[0].contacts.map((c) => c.id)).toEqual([ID1, ID3]);
     expect(board.total).toBe(3);
   });
 
@@ -186,7 +191,7 @@ describe("couche service · contact.service · tableau kanban (lot 2)", () => {
 
 describe("couche service · contact.service · déplacer un contact (lot 3)", () => {
   const serviceWith = (stage: string) => {
-    const repository = fakeRepository([aContact({ id: "1", stage })]);
+    const repository = fakeRepository([aContact({ id: ID1, stage })]);
     return { repository, service: createContactService(repository) };
   };
 
@@ -199,10 +204,10 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   ])("fait passer un contact de %s à %s", async (from, to) => {
     const { repository, service } = serviceWith(from);
 
-    const result = await service.moveContact("1", "next");
+    const result = await service.moveContact(ID1, "next");
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
-    expect(repository.updateStage).toHaveBeenCalledWith("1", to);
+    expect(repository.updateStage).toHaveBeenCalledWith(ID1, to);
   });
 
   // Critère 2 : « Étape précédente » ramène le contact dans la colonne précédente.
@@ -213,7 +218,7 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   ])("ramène un contact de %s à %s", async (from, to) => {
     const { service } = serviceWith(from);
 
-    const result = await service.moveContact("1", "previous");
+    const result = await service.moveContact(ID1, "previous");
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
   });
@@ -221,7 +226,7 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   it.each(["nouveau", "gagne", "perdu"])("refuse « Étape précédente » depuis %s, sans rien enregistrer", async (from) => {
     const { repository, service } = serviceWith(from);
 
-    const result = await service.moveContact("1", "previous");
+    const result = await service.moveContact(ID1, "previous");
 
     expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
     expect(repository.updateStage).not.toHaveBeenCalled();
@@ -231,7 +236,7 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   it.each(["nouveau", "contacte", "rdv", "proposition", "gagne"])("marque perdu un contact à l'étape %s", async (from) => {
     const { service } = serviceWith(from);
 
-    const result = await service.moveContact("1", "lost");
+    const result = await service.moveContact(ID1, "lost");
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: "perdu" }) });
   });
@@ -240,7 +245,7 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   it.each(["gagne", "perdu"])("refuse « Étape suivante » depuis %s, sans rien enregistrer", async (from) => {
     const { repository, service } = serviceWith(from);
 
-    const result = await service.moveContact("1", "next");
+    const result = await service.moveContact(ID1, "next");
 
     expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
     expect(repository.updateStage).not.toHaveBeenCalled();
@@ -286,10 +291,10 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   ])("rouvre un contact de %s vers %s", async (from, to) => {
     const { repository, service } = serviceWith(from);
 
-    const result = await service.reopenContact("1", to as never);
+    const result = await service.reopenContact(ID1, to as never);
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ stage: to }) });
-    expect(repository.updateStage).toHaveBeenCalledWith("1", to);
+    expect(repository.updateStage).toHaveBeenCalledWith(ID1, to);
   });
 
   it.each([
@@ -300,7 +305,7 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
   ])("refuse de rouvrir un contact de %s vers %s, sans rien enregistrer", async (from, to) => {
     const { repository, service } = serviceWith(from);
 
-    const result = await service.reopenContact("1", to as never);
+    const result = await service.reopenContact(ID1, to as never);
 
     expect(result).toEqual({ ok: false, error: "Ce déplacement n'est pas possible" });
     expect(repository.updateStage).not.toHaveBeenCalled();
@@ -316,7 +321,7 @@ describe("couche service · contact.service · déplacer un contact (lot 3)", ()
     const { repository, service } = serviceWith("rdv");
 
     expect(await service.moveContact("inconnu", "next")).toEqual({ ok: false, error: "Contact introuvable" });
-    expect(await service.moveContact("1", "sauter" as never)).toEqual({
+    expect(await service.moveContact(ID1, "sauter" as never)).toEqual({
       ok: false,
       error: "Ce déplacement n'est pas possible",
     });
@@ -334,12 +339,12 @@ describe("couche service · contact.service · relances (lot 4)", () => {
 
   // Critère 1 : une relance fixée à aujourd'hui fait apparaître le contact dans « À relancer ».
   it("fixe une relance à aujourd'hui et range le contact dans « À relancer »", async () => {
-    const { repository, service } = serviceWith([aContact({ id: "1", name: "Claire Martin" })]);
+    const { repository, service } = serviceWith([aContact({ id: ID1, name: "Claire Martin" })]);
 
-    const result = await service.setFollowUp("1", { date: "2026-11-21" });
+    const result = await service.setFollowUp(ID1, { date: "2026-11-21" });
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ followUpOn: "2026-11-21" }) });
-    expect(repository.updateFollowUp).toHaveBeenCalledWith("1", { date: "2026-11-21", awaitingReply: false });
+    expect(repository.updateFollowUp).toHaveBeenCalledWith(ID1, { date: "2026-11-21", awaitingReply: false });
     expect(await service.getFollowUps()).toEqual([
       { contact: expect.objectContaining({ name: "Claire Martin" }), overdue: false },
     ]);
@@ -347,47 +352,47 @@ describe("couche service · contact.service · relances (lot 4)", () => {
 
   // Critère 2 : une relance à une date passée apparaît, indiquée en retard.
   it("indique en retard une relance à une date passée", async () => {
-    const { service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-18" })]);
+    const { service } = serviceWith([aContact({ id: ID1, followUpOn: "2026-11-18" })]);
 
-    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: "1" }), overdue: true }]);
+    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: ID1 }), overdue: true }]);
   });
 
   // Critère 3 : une relance à une date future n'apparaît pas.
   it("n'affiche pas une relance à une date future", async () => {
-    const { service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-22" })]);
+    const { service } = serviceWith([aContact({ id: ID1, followUpOn: "2026-11-22" })]);
 
     expect(await service.getFollowUps()).toEqual([]);
   });
 
   // Critère 4 : aucune relance due, la liste est vide (la présentation affiche le message).
   it("renvoie une liste vide quand aucune relance n'est due", async () => {
-    const { service } = serviceWith([aContact({ id: "1" }), aContact({ id: "2", followUpOn: "2026-12-01" })]);
+    const { service } = serviceWith([aContact({ id: ID1 }), aContact({ id: ID2, followUpOn: "2026-12-01" })]);
 
     expect(await service.getFollowUps()).toEqual([]);
   });
 
   it("calcule « aujourd'hui » à l'heure de Paris, pas en UTC", async () => {
     // 21 novembre 23 h 30 UTC = 22 novembre 0 h 30 à Paris.
-    const repository = fakeRepository([aContact({ id: "1", followUpOn: "2026-11-22" })]);
+    const repository = fakeRepository([aContact({ id: ID1, followUpOn: "2026-11-22" })]);
     const service = createContactService(repository, () => new Date("2026-11-21T23:30:00Z"));
 
-    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: "1" }), overdue: false }]);
+    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: ID1 }), overdue: false }]);
   });
 
   it("trie les relances de la plus ancienne à la plus récente", async () => {
     const { service } = serviceWith([
-      aContact({ id: "1", followUpOn: "2026-11-21" }),
-      aContact({ id: "2", followUpOn: "2026-11-10" }),
-      aContact({ id: "3", followUpOn: "2026-11-15" }),
+      aContact({ id: ID1, followUpOn: "2026-11-21" }),
+      aContact({ id: ID2, followUpOn: "2026-11-10" }),
+      aContact({ id: ID3, followUpOn: "2026-11-15" }),
     ]);
 
-    expect((await service.getFollowUps()).map((f) => f.contact.id)).toEqual(["2", "3", "1"]);
+    expect((await service.getFollowUps()).map((f) => f.contact.id)).toEqual([ID2, ID3, ID1]);
   });
 
   it.each(["", "21/11/2026", "2026-02-30", undefined])("refuse la date %j sans rien enregistrer", async (date) => {
-    const { repository, service } = serviceWith([aContact({ id: "1" })]);
+    const { repository, service } = serviceWith([aContact({ id: ID1 })]);
 
-    expect(await service.setFollowUp("1", { date })).toEqual({ ok: false, error: "La date n'est pas valide" });
+    expect(await service.setFollowUp(ID1, { date })).toEqual({ ok: false, error: "La date n'est pas valide" });
     expect(repository.updateFollowUp).not.toHaveBeenCalled();
   });
 
@@ -410,42 +415,42 @@ describe("couche service · contact.service · relance faite (lot 5)", () => {
 
   // Critère 1 : « Relance faite » sort le contact de « À relancer ».
   it("sort de « À relancer » un contact dont la relance est faite", async () => {
-    const { repository, service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-21" })]);
+    const { repository, service } = serviceWith([aContact({ id: ID1, followUpOn: "2026-11-21" })]);
 
-    const result = await service.markFollowUpDone("1");
+    const result = await service.markFollowUpDone(ID1);
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ awaitingReply: true }) });
-    expect(repository.updateFollowUp).toHaveBeenCalledWith("1", { date: "2026-11-21", awaitingReply: true });
+    expect(repository.updateFollowUp).toHaveBeenCalledWith(ID1, { date: "2026-11-21", awaitingReply: true });
     expect(await service.getFollowUps()).toEqual([]);
   });
 
   // Critère 2 : le contact est « En attente de réponse » et reste dans sa colonne.
   it("laisse le contact dans sa colonne, en attente de réponse", async () => {
-    const { service } = serviceWith([aContact({ id: "1", stage: "rdv", followUpOn: "2026-11-18" })]);
+    const { service } = serviceWith([aContact({ id: ID1, stage: "rdv", followUpOn: "2026-11-18" })]);
 
-    await service.markFollowUpDone("1");
+    await service.markFollowUpDone(ID1);
 
     const rdv = (await service.getBoard()).columns.find((c) => c.stage === "rdv");
-    expect(rdv?.contacts).toEqual([expect.objectContaining({ id: "1", awaitingReply: true })]);
+    expect(rdv?.contacts).toEqual([expect.objectContaining({ id: ID1, awaitingReply: true })]);
   });
 
   // Critère 3 : une nouvelle date retire l'attente et remplace l'ancienne date.
   it("retire l'attente et remplace la date quand je fixe une nouvelle relance", async () => {
-    const { service } = serviceWith([aContact({ id: "1", followUpOn: "2026-11-18", awaitingReply: true })]);
+    const { service } = serviceWith([aContact({ id: ID1, followUpOn: "2026-11-18", awaitingReply: true })]);
 
-    const result = await service.setFollowUp("1", { date: "2026-11-21" });
+    const result = await service.setFollowUp(ID1, { date: "2026-11-21" });
 
     expect(result).toEqual({
       ok: true,
       contact: expect.objectContaining({ followUpOn: "2026-11-21", awaitingReply: false }),
     });
-    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: "1" }), overdue: false }]);
+    expect(await service.getFollowUps()).toEqual([{ contact: expect.objectContaining({ id: ID1 }), overdue: false }]);
   });
 
   it("refuse de marquer faite une relance absente, ou un contact inconnu", async () => {
-    const { repository, service } = serviceWith([aContact({ id: "1" })]);
+    const { repository, service } = serviceWith([aContact({ id: ID1 })]);
 
-    expect(await service.markFollowUpDone("1")).toEqual({ ok: false, error: "Aucune relance à marquer comme faite" });
+    expect(await service.markFollowUpDone(ID1)).toEqual({ ok: false, error: "Aucune relance à marquer comme faite" });
     expect(await service.markFollowUpDone("inconnu")).toEqual({ ok: false, error: "Contact introuvable" });
     expect(repository.updateFollowUp).not.toHaveBeenCalled();
   });
@@ -453,7 +458,7 @@ describe("couche service · contact.service · relance faite (lot 5)", () => {
 
 describe("couche service · contact.service · modifier ou supprimer (lot 6)", () => {
   const now = () => new Date("2026-11-21T09:00:00Z");
-  const claire = aContact({ id: "1", name: "Claire Martin", company: "Atelier Lumen", stage: "rdv", followUpOn: "2026-11-21" });
+  const claire = aContact({ id: ID1, name: "Claire Martin", company: "Atelier Lumen", stage: "rdv", followUpOn: "2026-11-21" });
   const serviceWith = (contacts: Contact[]) => {
     const repository = fakeRepository(contacts);
     return { repository, service: createContactService(repository, now) };
@@ -463,10 +468,10 @@ describe("couche service · contact.service · modifier ou supprimer (lot 6)", (
   it("enregistre la nouvelle entreprise, sans toucher à l'étape ni à la relance", async () => {
     const { repository, service } = serviceWith([claire]);
 
-    const result = await service.updateContact("1", { name: "Claire Martin", company: "Studio Nord" });
+    const result = await service.updateContact(ID1, { name: "Claire Martin", company: "Studio Nord" });
 
     expect(result).toEqual({ ok: true, contact: expect.objectContaining({ company: "Studio Nord", stage: "rdv" }) });
-    expect(repository.update).toHaveBeenCalledWith("1", {
+    expect(repository.update).toHaveBeenCalledWith(ID1, {
       name: "Claire Martin",
       company: "Studio Nord",
       email: null,
@@ -480,7 +485,7 @@ describe("couche service · contact.service · modifier ou supprimer (lot 6)", (
   it("refuse un nom vide sans rien enregistrer", async () => {
     const { repository, service } = serviceWith([claire]);
 
-    const result = await service.updateContact("1", { name: "  ", company: "Studio Nord" });
+    const result = await service.updateContact(ID1, { name: "  ", company: "Studio Nord" });
 
     expect(result).toEqual({ ok: false, errors: { name: "Le nom est obligatoire" } });
     expect(repository.update).not.toHaveBeenCalled();
@@ -502,7 +507,7 @@ describe("couche service · contact.service · modifier ou supprimer (lot 6)", (
     const { service } = serviceWith([claire]);
     expect(await service.getFollowUps()).toHaveLength(1);
 
-    expect(await service.deleteContact("1")).toEqual({ ok: true });
+    expect(await service.deleteContact(ID1)).toEqual({ ok: true });
 
     expect((await service.getBoard()).total).toBe(0);
     expect(await service.getFollowUps()).toEqual([]);
@@ -515,3 +520,31 @@ describe("couche service · contact.service · modifier ou supprimer (lot 6)", (
   });
 });
 
+
+// #21 : l'identifiant venu du navigateur est validé par le service avant d'aller en base.
+describe("couche service · contact.service · identifiant de contact", () => {
+  const methods = {
+    updateContact: (service: ReturnType<typeof createContactService>, id: string) =>
+      service.updateContact(id, { name: "Claire" }),
+    deleteContact: (service: ReturnType<typeof createContactService>, id: string) => service.deleteContact(id),
+    moveContact: (service: ReturnType<typeof createContactService>, id: string) => service.moveContact(id, "next"),
+    reopenContact: (service: ReturnType<typeof createContactService>, id: string) =>
+      service.reopenContact(id, "nouveau"),
+    setFollowUp: (service: ReturnType<typeof createContactService>, id: string) =>
+      service.setFollowUp(id, { date: "2026-11-25" }),
+    markFollowUpDone: (service: ReturnType<typeof createContactService>, id: string) => service.markFollowUpDone(id),
+  };
+
+  it.each(Object.keys(methods) as (keyof typeof methods)[])(
+    "%s refuse un identifiant mal formé sans interroger la base",
+    async (method) => {
+      const repository = fakeRepository([aContact({ id: "abc", stage: "gagne", followUpOn: "2026-11-21" })]);
+      const service = createContactService(repository);
+
+      const result = await methods[method](service, "abc");
+
+      expect(result).toMatchObject({ ok: false, error: "Contact introuvable" });
+      for (const call of Object.values(repository)) expect(call).not.toHaveBeenCalled();
+    },
+  );
+});

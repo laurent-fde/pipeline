@@ -11,7 +11,7 @@ export function fakeContactRepository(initial: Contact[] = []) {
     insert: vi.fn(async (input: NewContact) => {
       const contact: Contact = {
         ...input,
-        id: String(contacts.length + 1),
+        id: `00000000-0000-4000-8000-${String(contacts.length + 1).padStart(12, "0")}`,
         followUpOn: null,
         awaitingReply: false,
         createdAt: "2026-11-20T10:00:00.000Z",
