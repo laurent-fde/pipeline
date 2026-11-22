@@ -2,9 +2,9 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createClient } from "@libsql/client";
+import { createClient, type InStatement } from "@libsql/client";
 import { afterEach, describe, expect, it } from "vitest";
-import { openDatabase, resolveDatabaseUrl, type Database } from "./db";
+import { migrate, openDatabase, resolveDatabaseUrl, type Database } from "./db";
 
 describe("couche données · db (adresse de la base)", () => {
   it("utilise DATABASE_URL quand elle est remplie", () => {
@@ -96,5 +96,35 @@ describe("couche données · db (migrations)", () => {
 
     const { rows } = await db.client.execute("SELECT COUNT(*) AS n FROM schema_migrations");
     expect(Number(rows[0].n)).toBe(4);
+  });
+
+  // #34 : deux serveurs démarrent ensemble. Le second a lu « rien d'appliqué » juste avant que le premier
+  // applique les migrations : il ne doit ni planter ni noter deux fois les mêmes versions.
+  it("tolère une migration appliquée entre-temps par un autre serveur", async () => {
+    const db = await open(tempUrl());
+    let staleReads = 1;
+    const lateServer = new Proxy(db.client, {
+      get(target, key, receiver) {
+        if (key !== "execute") {
+          const value = Reflect.get(target, key, receiver);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return async (statement: InStatement) => {
+          const sql = typeof statement === "string" ? statement : statement.sql;
+          if (staleReads > 0 && sql.startsWith("SELECT MAX(version)")) {
+            staleReads--;
+            return { rows: [{ v: null }] };
+          }
+          if (sql.startsWith("PRAGMA user_version")) return { rows: [{ user_version: 0 }] };
+          return target.execute(statement);
+        };
+      },
+    });
+
+    await expect(migrate(lateServer)).resolves.toBeUndefined();
+
+    expect(await appliedVersion(db)).toBe(4);
+    const { rows } = await db.client.execute("SELECT version, COUNT(*) AS n FROM schema_migrations GROUP BY version HAVING n > 1");
+    expect(rows).toEqual([]);
   });
 });

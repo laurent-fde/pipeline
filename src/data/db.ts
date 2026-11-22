@@ -26,10 +26,14 @@ const migrations = [
   `ALTER TABLE contacts ADD COLUMN follow_up_done INTEGER NOT NULL DEFAULT 0`,
 ];
 
-async function migrate(client: Client) {
-  await client.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL)");
+async function appliedVersion(client: Client): Promise<number | null> {
   const { rows } = await client.execute("SELECT MAX(version) AS v FROM schema_migrations");
-  let applied = rows[0]?.v == null ? null : Number(rows[0].v);
+  return rows[0]?.v == null ? null : Number(rows[0].v);
+}
+
+export async function migrate(client: Client) {
+  await client.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL)");
+  let applied = await appliedVersion(client);
   if (applied === null) {
     // Base créée avant schema_migrations : on reprend l'ancien compteur (le lire reste permis).
     const legacy = await client.execute("PRAGMA user_version");
@@ -38,11 +42,22 @@ async function migrate(client: Client) {
       await client.execute({ sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [applied] });
     }
   }
-  for (let version = applied; version < migrations.length; version++) {
-    await client.batch(
-      [migrations[version], { sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [version + 1] }],
-      "write",
-    );
+  // Chaque migration et sa version sont écrites ensemble (une transaction) : tout ou rien.
+  // #34 : si un autre serveur, démarré en même temps, l'a appliquée entre-temps, la transaction échoue
+  // et est annulée ; on relit alors où en est la base et on reprend après, au lieu de planter.
+  let version = applied;
+  while (version < migrations.length) {
+    try {
+      await client.batch(
+        [migrations[version], { sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [version + 1] }],
+        "write",
+      );
+      version++;
+    } catch (error) {
+      const current = (await appliedVersion(client)) ?? 0;
+      if (current <= version) throw error;
+      version = current;
+    }
   }
 }
 
