@@ -35,6 +35,7 @@ export function ContactSheet({
   stageLabel,
   open,
   onOpenChange,
+  notice,
   stage,
   followUp,
   actions,
@@ -43,6 +44,8 @@ export function ContactSheet({
   stageLabel: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Lot 10 : un message en tête de fiche (contact sorti de la recherche ou du filtre).
+  notice?: string;
   stage?: ReactNode;
   followUp?: ReactNode;
   actions?: ReactNode;
@@ -61,6 +64,12 @@ export function ContactSheet({
             {contact.awaitingReply && <Badge variant="outline">En attente de réponse</Badge>}
           </div>
         </SheetHeader>
+
+        {notice && (
+          <p role="status" className="mx-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {notice}
+          </p>
+        )}
 
         {stage && <Section title="Étape">{stage}</Section>}
 

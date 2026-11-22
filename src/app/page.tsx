@@ -11,7 +11,7 @@ import {
   setFollowUpAction,
   updateContactAction,
 } from "@/presentation/actions/contact.action";
-import { BoardToolbar } from "@/presentation/components/board-toolbar";
+import { BoardToolbar, BoardViewProvider } from "@/presentation/components/board-toolbar";
 import { FollowUpList } from "@/presentation/components/follow-up-list";
 import { KanbanBoard } from "@/presentation/components/kanban-board";
 import { NewContactDialog } from "@/presentation/components/new-contact-dialog";
@@ -24,8 +24,9 @@ async function Board({ searchParams }: { searchParams: Promise<BoardViewInput> }
   await connection();
   const board = await getContactService().getBoard(await searchParams);
   return (
-    <div className="grid gap-3">
-      <BoardToolbar view={board.view} />
+    <BoardViewProvider view={board.view}>
+      <div className="grid gap-3">
+      <BoardToolbar />
       <KanbanBoard
       board={board}
       moveAction={moveContactAction}
@@ -35,7 +36,8 @@ async function Board({ searchParams }: { searchParams: Promise<BoardViewInput> }
       deleteAction={deleteContactAction}
       dropAction={dropContactAction}
       />
-    </div>
+      </div>
+    </BoardViewProvider>
   );
 }
 

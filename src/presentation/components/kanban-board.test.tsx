@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Board, BoardContact } from "@/services/contact.service";
 import { allowedMoves, dropTargets, reopenTargets } from "@/services/stages";
+import { BoardViewProvider } from "./board-toolbar";
 import { KanbanBoard } from "./kanban-board";
 
 // Lot 10 : « Effacer la recherche » change l'adresse de la page.
@@ -189,15 +190,22 @@ describe("couche présentation · KanbanBoard", () => {
     expect(within(sheet).getByText("Contacté")).toBeDefined();
   });
 
-  it("referme la fiche quand le contact n'existe plus", () => {
-    const { rerender } = render(
-      <KanbanBoard board={board([contact("1", "Claire Martin", "nouveau")])} moveAction={vi.fn()} />,
+  it("referme la fiche après la suppression du contact", async () => {
+    const deleteAction = vi.fn(async () => ({}));
+    render(
+      <KanbanBoard
+        board={board([contact("1", "Claire Martin", "nouveau")])}
+        updateAction={vi.fn()}
+        deleteAction={deleteAction}
+      />,
     );
 
     openSheet("Claire Martin");
-    rerender(<KanbanBoard board={board([])} moveAction={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer Claire Martin" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmer la suppression" }));
 
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await vi.waitFor(() => expect(deleteAction).toHaveBeenCalledWith("1"));
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("n'active pas « Étape précédente » dans la fiche d'un contact Gagné", () => {
@@ -374,7 +382,11 @@ describe("couche présentation · KanbanBoard · recherche et filtres (lot 10)",
   // Critère 4 : rien ne correspond → un message et un bouton qui remet le tableau complet.
   it("annonce qu'aucun contact ne correspond, et « Effacer la recherche » remet le tableau complet", () => {
     replace.mockClear();
-    render(<KanbanBoard board={board([], { q: "zzz", filtre: "a-relancer" }, 3)} />);
+    render(
+      <BoardViewProvider view={{ q: "zzz", filtre: "a-relancer" }}>
+        <KanbanBoard board={board([], { q: "zzz", filtre: "a-relancer" }, 3)} />
+      </BoardViewProvider>,
+    );
 
     expect(screen.getByText("Aucun contact ne correspond")).toBeDefined();
     expect(screen.queryByText(/ajoute ton premier contact/i)).toBeNull();
@@ -402,5 +414,26 @@ describe("couche présentation · KanbanBoard · recherche et filtres (lot 10)",
 
     openSheet("Claire Martin");
     expect(screen.getByRole("dialog", { name: "Claire Martin" })).toBeDefined();
+  });
+});
+
+// Revue du lot 10 : un contact qui sort du filtre après une action faite depuis sa fiche.
+describe("couche présentation · KanbanBoard · fiche sur un tableau filtré (lot 10)", () => {
+  it("garde la fiche ouverte quand le contact ne correspond plus au filtre, et le signale", () => {
+    const view = { q: "", filtre: "a-relancer" } as const;
+    const page = (contacts: BoardContact[]) => (
+      <BoardViewProvider view={view}>
+        <KanbanBoard board={board(contacts, view, 3)} moveAction={vi.fn()} />
+      </BoardViewProvider>
+    );
+    const { rerender } = render(page([contact("1", "Claire Martin", "nouveau")]));
+
+    openSheet("Claire Martin");
+    // Relance faite depuis la fiche : le contact sort du filtre « À relancer ».
+    rerender(page([]));
+
+    const sheet = screen.getByRole("dialog", { name: "Claire Martin" });
+    expect(within(sheet).getByText("Ce contact ne correspond plus à la recherche ou au filtre.")).toBeDefined();
+    expect(within(sheet).queryByRole("button", { name: "Étape suivante" })).toBeNull();
   });
 });

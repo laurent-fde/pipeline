@@ -50,9 +50,12 @@ export type BoardViewInput = { q?: string | string[]; filtre?: string | string[]
 export type Board = { columns: BoardColumn[]; total: number; visible: number; view: BoardView };
 
 const first = (value: unknown) => (Array.isArray(value) ? value[0] : value);
+const DEFAULT_VIEW: BoardView = { q: "", filtre: "tous" };
+// Une seule règle : chaque champ invalide reprend sa valeur par défaut (.catch), le reste est gardé.
+// Une recherche trop longue (adresse partagée) est tronquée à 100 caractères plutôt qu'effacée.
 const viewSchema = z.object({
-  q: z.preprocess(first, z.string().trim().max(100).catch("")).catch(""),
-  filtre: z.preprocess(first, z.enum(FILTERS).catch("tous")).catch("tous"),
+  q: z.preprocess(first, z.string().trim().transform((text) => text.slice(0, 100))).catch(""),
+  filtre: z.preprocess(first, z.enum(FILTERS)).catch("tous"),
 });
 
 // Minuscules et sans accents : « Éléonore » et « eleonore » se correspondent.
@@ -185,7 +188,8 @@ export function createContactService(repository: ContactRepository, now: () => D
     // Une colonne par étape, toujours les six, même vides. L'ordre des contacts reçu est conservé.
     async getBoard(input: BoardViewInput = {}): Promise<Board> {
       const parsed = viewSchema.safeParse(input);
-      const view: BoardView = parsed.success ? parsed.data : { q: "", filtre: "tous" };
+      // Les .catch du schéma font toujours réussir la lecture ; DEFAULT_VIEW n'est qu'un filet.
+      const view: BoardView = parsed.data ?? DEFAULT_VIEW;
       const today = parisToday(now());
       const contacts = await repository.findAll();
       const columns = STAGES.map(({ id, label }) => {

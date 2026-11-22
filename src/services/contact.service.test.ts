@@ -736,14 +736,21 @@ describe("couche service · contact.service · recherche et filtres (lot 10)", (
   });
 
   // Critère 5 : la vue vient de l'adresse de la page ; une valeur invalide est ignorée, sans erreur.
-  it("renvoie la vue appliquée, et ignore un filtre inconnu ou une recherche démesurée", async () => {
+  it("renvoie la vue appliquée, ignore un filtre inconnu et tronque une recherche démesurée", async () => {
     const service = serviceWith(contacts);
 
     expect((await service.getBoard({ q: " lumen ", filtre: "en-attente" })).view).toEqual({ q: "lumen", filtre: "en-attente" });
 
-    const invalid = await service.getBoard({ q: "x".repeat(101), filtre: "n-importe-quoi" });
-    expect(invalid.view).toEqual({ q: "", filtre: "tous" });
-    expect(invalid.visible).toBe(5);
+    const invalid = await service.getBoard({ q: "x".repeat(150), filtre: "n-importe-quoi" });
+    expect(invalid.view).toEqual({ q: "x".repeat(100), filtre: "tous" });
+  });
+
+  // Critère 4 : la vue vide (« Effacer la recherche ») remet le tableau complet.
+  it("remet le tableau complet avec une vue vide", async () => {
+    const board = await serviceWith(contacts).getBoard({ q: "", filtre: "tous" });
+
+    expect(board.visible).toBe(board.total);
+    expect(board.view).toEqual({ q: "", filtre: "tous" });
   });
 
   it("accepte les paramètres d'adresse répétés en gardant le premier", async () => {

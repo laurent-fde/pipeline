@@ -2,7 +2,7 @@
 
 import { Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { BoardFilter, BoardView } from "@/services/contact.service";
 import { Button } from "@/presentation/components/ui/button";
 import { Input } from "@/presentation/components/ui/input";
@@ -14,6 +14,8 @@ const FILTER_LABELS: { id: BoardFilter; label: string }[] = [
   { id: "en-attente", label: "En attente de réponse" },
 ];
 
+const TYPING_DELAY = 250;
+
 // Lot 10 : l'adresse de la page pour une vue. Les valeurs par défaut (recherche vide, « Tous ») n'y figurent pas.
 export function viewHref(pathname: string, view: BoardView): string {
   const params = new URLSearchParams();
@@ -23,33 +25,86 @@ export function viewHref(pathname: string, view: BoardView): string {
   return query ? `${pathname}?${query}` : pathname;
 }
 
-// Change la vue en remplaçant l'adresse : le tableau est relu par le serveur avec la nouvelle vue.
-export function useSetView() {
-  const router = useRouter();
-  const pathname = usePathname();
-  return (view: BoardView) => router.replace(viewHref(pathname, view), { scroll: false });
+type BoardViewContextValue = {
+  view: BoardView;
+  query: string;
+  type: (value: string) => void;
+  setFilter: (filtre: BoardFilter) => void;
+  // « Effacer la recherche » : vide la recherche ET retire le filtre, pour revenir au tableau complet.
+  clear: () => void;
+};
+
+const BoardViewContext = createContext<BoardViewContextValue | null>(null);
+
+export function useBoardView(): BoardViewContextValue {
+  const value = useContext(BoardViewContext);
+  if (!value) throw new Error("useBoardView doit être utilisé dans un BoardViewProvider");
+  return value;
 }
 
-// Lot 10 : rechercher et filtrer au-dessus du tableau. view : la vue appliquée par le service.
-export function BoardToolbar({ view }: { view: BoardView }) {
-  const setView = useSetView();
+// Lot 10 : la vue du tableau (recherche et filtre), partagée par la barre et « Aucun contact ne correspond ».
+// view : la vue appliquée par le service, lue dans l'adresse. Choix : l'adresse est remplacée (router.replace),
+// sans ajouter d'entrée à l'historique ; le bouton « retour » du navigateur quitte donc la page.
+export function BoardViewProvider({ view, children }: { view: BoardView; children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [query, setQuery] = useState(view.q);
-  // Recherche effacée ailleurs (« Effacer la recherche ») : le champ se vide aussi.
-  const [appliedQuery, setAppliedQuery] = useState(view.q);
-  if (view.q !== appliedQuery) {
-    setAppliedQuery(view.q);
-    if (view.q === "") setQuery("");
-  }
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [typing, setTyping] = useState(false);
+  // Le filtre demandé, connu tout de suite (la page met un instant à revenir avec la nouvelle vue).
+  const filter = useRef(view.filtre);
+
+  // L'adresse change ailleurs (rechargement, « Effacer la recherche », lien) : le champ et le filtre la suivent,
+  // sauf pendant que je tape encore (sinon le champ reviendrait en arrière sous mes doigts).
+  const [applied, setApplied] = useState(view);
+  if (view.q !== applied.q || view.filtre !== applied.filtre) {
+    setApplied(view);
+    if (!typing) setQuery(view.q);
+  }
+  useEffect(() => {
+    filter.current = view.filtre;
+  }, [view.filtre]);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  // L'adresse suit la saisie peu après la frappe, pas à chaque touche.
-  const type = (value: string) => {
-    setQuery(value);
+  const go = (next: BoardView) => router.replace(viewHref(pathname, next), { scroll: false });
+  const cancelTyping = () => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setView({ ...view, q: value.trim() }), 250);
+    setTyping(false);
   };
+
+  const value: BoardViewContextValue = {
+    view,
+    query,
+    // L'adresse suit la saisie peu après la frappe, pas à chaque touche, avec le filtre du moment.
+    type: (text) => {
+      setQuery(text);
+      clearTimeout(timer.current);
+      setTyping(true);
+      timer.current = setTimeout(() => {
+        setTyping(false);
+        go({ q: text.trim(), filtre: filter.current });
+      }, TYPING_DELAY);
+    },
+    setFilter: (filtre) => {
+      cancelTyping();
+      filter.current = filtre;
+      go({ q: query.trim(), filtre });
+    },
+    clear: () => {
+      cancelTyping();
+      filter.current = "tous";
+      setQuery("");
+      go({ q: "", filtre: "tous" });
+    },
+  };
+
+  return <BoardViewContext.Provider value={value}>{children}</BoardViewContext.Provider>;
+}
+
+// Lot 10 : rechercher et filtrer au-dessus du tableau.
+export function BoardToolbar() {
+  const { view, query, type, setFilter } = useBoardView();
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -76,7 +131,7 @@ export function BoardToolbar({ view }: { view: BoardView }) {
             size="sm"
             variant={view.filtre === id ? "default" : "outline"}
             aria-pressed={view.filtre === id}
-            onClick={() => setView({ q: query.trim(), filtre: id })}
+            onClick={() => setFilter(id)}
           >
             {label}
           </Button>
