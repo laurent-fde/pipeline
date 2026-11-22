@@ -81,10 +81,36 @@ Un contact Gagné ou Perdu peut revenir dans le pipeline : je le rouvre vers l'�
 
 ## Lot 8 · Glisser-déposer un contact sur le kanban
 
-Je fais glisser la carte d'un contact sur une autre colonne pour changer son étape, sans passer par les boutons. Seuls les déplacements déjà permis sont acceptés : colonne suivante, précédente, Perdu, et depuis Gagné ou Perdu, une étape en cours.
+Je fais glisser la carte d'un contact sur une autre colonne pour changer son étape, sans passer par les boutons. Seuls les déplacements déjà permis sont acceptés : colonne suivante, précédente, Perdu, et depuis Gagné ou Perdu, une étape en cours. Livré avec la PR #26, corrigé par #27 et #28.
 
-- [ ] Étant donné un contact, quand je glisse sa carte sur une colonne permise, alors il passe dans cette colonne.
-- [ ] Étant donné une carte en cours de glissement, quand je regarde le tableau, alors les colonnes où je peux la déposer sont mises en évidence, en clair comme en sombre.
-- [ ] Étant donné une colonne non permise (par exemple Nouveau → RDV), quand j'y dépose la carte, alors « Ce déplacement n'est pas possible » s'affiche et le contact reste dans sa colonne.
-- [ ] Étant donné un contact déplacé par glisser-déposer, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
-- [ ] Étant donné le clavier ou un écran tactile, quand je veux changer d'étape, alors les boutons d'étape restent disponibles.
+- [x] Étant donné un contact, quand je glisse sa carte sur une colonne permise, alors il passe dans cette colonne.
+  → `contact.service.test.ts` « dépose un contact de %s sur %s » ; `contact.action.test.ts` « passe la colonne d'arrivée au service… » ; `kanban-board.test.tsx` « demande le déplacement quand la carte est déposée sur une autre colonne ».
+- [x] Étant donné une carte en cours de glissement, quand je regarde le tableau, alors les colonnes où je peux la déposer sont mises en évidence, en clair comme en sombre.
+  → `contact.service.test.ts` « donne à chaque colonne les colonnes où déposer ses cartes » ; `kanban-board.test.tsx` « met en évidence les colonnes où déposer la carte pendant le glissement » (attribut et classe de mise en évidence) ; captures clair et sombre dans la PR.
+- [x] Étant donné une colonne non permise (par exemple Nouveau → RDV), quand j'y dépose la carte, alors « Ce déplacement n'est pas possible » s'affiche et le contact reste dans sa colonne.
+  → `contact.service.test.ts` « refuse de déposer un contact de %s sur %s, sans rien enregistrer » ; `kanban-board.test.tsx` « annonce le refus d'un dépôt sur une colonne non permise ».
+- [x] Étant donné un contact déplacé par glisser-déposer, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
+  → `contact.repository.test.ts` « garde la nouvelle étape après un redémarrage » : le dépôt enregistre l'étape par le même `updateStage` que les boutons.
+- [x] Étant donné le clavier ou un écran tactile, quand je veux changer d'étape, alors les boutons d'étape restent disponibles.
+  → `kanban-board.test.tsx` « garde les boutons d'étape… » (sur la carte, puis dans la fiche contact à partir du lot 9).
+
+## Lot 9 · Refonte de l'interface
+
+L'écran devient plus lisible : une barre du haut, des indicateurs, des cartes compactes et une fiche contact qui regroupe les actions. D'après la maquette validée. Aucune règle métier ne change : les critères des lots 1 à 8 restent vrais.
+
+- [x] Étant donné l'app ouverte, quand je regarde le haut de la page, alors je vois le titre, le bouton de thème et un bouton « Nouveau contact » ; le formulaire d'ajout n'est plus affiché en permanence.
+  → `new-contact-dialog.test.tsx` « n'affiche le formulaire qu'après un clic sur « Nouveau contact » » ; barre du haut vérifiée dans le navigateur.
+- [x] Étant donné le bouton « Nouveau contact », quand je clique dessus, alors une fenêtre s'ouvre avec le formulaire ; un ajout réussi la ferme et le contact arrive dans Nouveau ; une saisie refusée garde la fenêtre ouverte avec le message (critères du lot 1).
+  → `new-contact-dialog.test.tsx` « ferme la fenêtre après un ajout réussi », « garde la fenêtre ouverte avec le message quand la saisie est refusée ».
+- [x] Étant donné des contacts, quand j'affiche l'app, alors quatre indicateurs montrent : les contacts en cours sur le total, les relances dues aujourd'hui dont celles en retard, les contacts en attente de réponse, et le taux de gain (gagnés sur gagnés + perdus, « — » s'il n'y en a aucun).
+  → `contact.service.test.ts` « compte les contacts en cours… », « n'a pas de taux de gain… », « arrondit le taux de gain… » ; `stats-bar.test.tsx`.
+- [x] Étant donné une carte, quand je la regarde, alors elle montre seulement le nom, l'entreprise, un badge de relance (« en retard », « aujourd'hui » ou la date à venir), le badge « En attente de réponse » s'il y a lieu, un bouton « étape suivante » et une poignée de glissement.
+  → `contact.service.test.ts` « donne à chaque carte l'état de sa relance… » ; `contact-card.test.tsx` ; `kanban-board.test.tsx` « met un bouton « étape suivante » sur la carte… ».
+- [x] Étant donné une carte, quand je clique sur le nom du contact, alors sa fiche s'ouvre sur le côté avec l'étape, les boutons d'étape et « Rouvrir vers… », les coordonnées, la relance, « Modifier » et « Supprimer » (critères des lots 3 à 7).
+  → `kanban-board.test.tsx` « propose « Rouvrir vers… » dans la fiche… », « n'active pas « Étape précédente » dans la fiche… », « garde les boutons d'étape… dans leur fiche », « garde la fiche ouverte quand le contact change de colonne » ; `contact-sheet.test.tsx` (étape, coordonnées, relance, modifier).
+- [x] Étant donné le tableau, quand je le regarde, alors chaque étape a sa couleur, Gagné et Perdu sont plus discrètes, et une colonne vide affiche « Aucun contact · Glisse une carte ici ».
+  → `kanban-board.test.tsx` « donne sa couleur à chaque étape… » (six couleurs du thème, toutes différentes), « annonce une colonne vide ».
+- [x] Étant donné une carte, quand je la glisse, alors seule la poignée lance le glissement (le texte et les champs restent utilisables), et la mise en évidence d'une colonne s'éteint quand j'en sors (#29).
+  → `kanban-board.test.tsx` « ne rend déplaçable que la poignée… », « éteint la mise en évidence au survol… ».
+- [x] Étant donné le thème clair ou sombre, quand j'utilise l'écran, alors tout est lisible et rien n'est coupé, sur grand écran comme sur téléphone.
+  → vérifié dans le navigateur en clair et en sombre (tableau, fiche, fenêtre d'ajout) sur grand écran (1440 px) et à largeur de téléphone (390 px) : pas de défilement horizontal de la page, seul le tableau défile.

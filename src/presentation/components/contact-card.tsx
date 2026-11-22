@@ -1,46 +1,65 @@
-import type { Contact } from "@/services/contact.service";
 import type { ReactNode } from "react";
+import type { Contact, FollowUpState } from "@/services/contact.service";
 import { Badge } from "@/presentation/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/presentation/components/ui/card";
+import { cn } from "@/presentation/lib/utils";
 
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
+type CardContact = Contact & { followUp?: FollowUpState };
 
-// children : les actions posées sous la carte (étape, relance…).
-export function ContactCard({ contact, children }: { contact: Contact; children?: ReactNode }) {
+// Lot 9 : le badge de relance. L'état (en retard, aujourd'hui, à venir) est décidé par le service.
+function FollowUpBadge({ contact }: { contact: CardContact }) {
+  if (contact.followUp === "overdue") return <Badge variant="destructive">en retard</Badge>;
+  if (contact.followUp === "today")
+    return <Badge className="bg-warning text-warning-foreground">aujourd&apos;hui</Badge>;
+  if (contact.followUp === "upcoming")
+    return (
+      <Badge variant="outline" className="font-mono">
+        <time dateTime={contact.followUpOn ?? undefined}>{contact.followUpOn}</time>
+      </Badge>
+    );
+  return null;
+}
+
+// Lot 9 : carte compacte. Nom, entreprise, badges ; les coordonnées et les actions sont dans la fiche.
+// leading : la poignée de glissement ; title : le nom cliquable qui ouvre la fiche ; actions : à droite.
+export function ContactCard({
+  contact,
+  leading,
+  title,
+  actions,
+  className,
+}: {
+  contact: CardContact;
+  leading?: ReactNode;
+  title?: ReactNode;
+  actions?: ReactNode;
+  className?: string;
+}) {
+  const hasBadges = !!contact.followUp || contact.awaitingReply;
+
   return (
-    <Card size="sm">
-      <CardHeader className="flex items-center gap-3">
-        <div
-          aria-hidden
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-accent text-sm font-semibold text-accent-foreground"
-        >
-          {initials(contact.name)}
-        </div>
-        <div className="min-w-0">
-          {/* Niveau 4 : sous le titre de colonne (niveau 3) du tableau. */}
-          <CardTitle role="heading" aria-level={4} className="truncate">
-            {contact.name}
-          </CardTitle>
-          {contact.company && <p className="truncate text-sm text-muted-foreground">{contact.company}</p>}
-          {contact.awaitingReply && (
-            <Badge variant="outline" className="mt-1 h-auto whitespace-normal">
-              En attente de réponse
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      {(contact.email || contact.phone) && (
-        <CardContent className="grid gap-1 font-mono text-xs text-muted-foreground">
-          {contact.email && <span className="truncate">{contact.email}</span>}
-          {contact.phone && <span>{contact.phone}</span>}
-        </CardContent>
+    <article
+      className={cn(
+        "flex min-w-0 items-start gap-1.5 rounded-lg border border-border bg-card p-2 text-card-foreground shadow-xs",
+        className,
       )}
-      {children && <CardContent className="grid min-w-0 gap-2">{children}</CardContent>}
-    </Card>
+    >
+      {leading}
+      <div className="grid min-w-0 flex-1 gap-1">
+        {/* Niveau 4 : sous le titre de colonne (niveau 3) du tableau. */}
+        <h4 className="truncate text-sm leading-snug font-medium">{title ?? contact.name}</h4>
+        {contact.company && <p className="truncate text-xs text-muted-foreground">{contact.company}</p>}
+        {hasBadges && (
+          <div className="flex flex-wrap gap-1">
+            <FollowUpBadge contact={contact} />
+            {contact.awaitingReply && (
+              <Badge variant="secondary" className="h-auto whitespace-normal">
+                En attente de réponse
+              </Badge>
+            )}
+          </div>
+        )}
+      </div>
+      {actions}
+    </article>
   );
 }

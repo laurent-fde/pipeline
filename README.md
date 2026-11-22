@@ -34,3 +34,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Base de données (Pipeline)
+
+- En local, sans `DATABASE_URL` : un fichier SQLite dans `.data/pipeline.db`, créé tout seul.
+- Avec `DATABASE_URL` et `DATABASE_AUTH_TOKEN` dans `.env.local` : la base Turso (voir `.env.example`, sans valeur).
+- Sur un déploiement Vercel (`VERCEL_ENV` = `production` ou `preview`), `DATABASE_URL` est obligatoire : sans elle, l'app refuse de démarrer au lieu d'écrire sur un disque qui s'efface. Pour les déploiements preview, coche aussi « Preview » sur les variables du projet Vercel.
+- Un `vercel env pull` qui écrit `VERCEL=1` dans `.env.local` ne change rien en local (#31).
