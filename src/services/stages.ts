@@ -22,14 +22,28 @@ export type AllowedMoves = Record<Move, boolean>;
 
 const ORDER: readonly string[] = STAGES.map((stage) => stage.id);
 
+const CLOSED_STAGES: readonly string[] = ["gagne", "perdu"];
+
+// Les étapes en cours : vers elles, un contact Gagné ou Perdu peut être rouvert.
+const OPEN_STAGES = STAGES.filter((stage) => !CLOSED_STAGES.includes(stage.id));
+
+export type ReopenTarget = { stage: Stage; label: string };
+
 // L'étape d'arrivée d'un déplacement, ou null s'il n'est pas permis.
-// « Étape suivante » s'arrête à Gagné ; « Étape précédente » suit l'ordre des colonnes (Perdu revient à Gagné).
+// « Étape suivante » s'arrête à Gagné ; « Étape précédente » s'arrête à Nouveau et ne sert pas
+// sur Gagné ou Perdu : on en sort avec « Rouvrir vers… », vers une étape choisie.
 export function targetStage(stage: string, move: Move): Stage | null {
   const index = ORDER.indexOf(stage);
   if (index === -1) return null;
   if (move === "lost") return stage === "perdu" ? null : "perdu";
-  if (move === "next") return stage === "gagne" || stage === "perdu" ? null : STAGES[index + 1].id;
+  if (CLOSED_STAGES.includes(stage)) return null;
+  if (move === "next") return STAGES[index + 1].id;
   return index === 0 ? null : STAGES[index - 1].id;
+}
+
+// Les étapes vers lesquelles rouvrir un contact : toutes celles en cours s'il est Gagné ou Perdu, aucune sinon.
+export function reopenTargets(stage: string): ReopenTarget[] {
+  return CLOSED_STAGES.includes(stage) ? OPEN_STAGES.map(({ id, label }) => ({ stage: id, label })) : [];
 }
 
 export function allowedMoves(stage: string): AllowedMoves {
