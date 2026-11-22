@@ -127,4 +127,38 @@ describe("couche données · db (migrations)", () => {
     const { rows } = await db.client.execute("SELECT version, COUNT(*) AS n FROM schema_migrations GROUP BY version HAVING n > 1");
     expect(rows).toEqual([]);
   });
+
+  // Revue de #34 : une migration qu'on peut rejouer sans erreur (IF NOT EXISTS, UPDATE…) ne doit pas
+  // être appliquée deux fois ni notée deux fois : la version est unique.
+  it("n'applique pas deux fois une migration rejouable, même lancée par un serveur en retard", async () => {
+    const client = createClient({ url: ":memory:" });
+    const list = [`CREATE TABLE IF NOT EXISTS t (n INTEGER)`, `INSERT INTO t (n) VALUES (1)`];
+    await migrate(client, list);
+
+    let staleReads = 1;
+    const lateServer = new Proxy(client, {
+      get(target, key, receiver) {
+        if (key !== "execute") {
+          const value = Reflect.get(target, key, receiver);
+          return typeof value === "function" ? value.bind(target) : value;
+        }
+        return async (statement: InStatement) => {
+          const sql = typeof statement === "string" ? statement : statement.sql;
+          if (staleReads > 0 && sql.startsWith("SELECT MAX(version)")) {
+            staleReads--;
+            return { rows: [{ v: null }] };
+          }
+          if (sql.startsWith("PRAGMA user_version")) return { rows: [{ user_version: 0 }] };
+          return target.execute(statement);
+        };
+      },
+    });
+    await migrate(lateServer, list);
+
+    const t = await client.execute("SELECT COUNT(*) AS n FROM t");
+    expect(Number(t.rows[0].n)).toBe(1);
+    const versions = await client.execute("SELECT COUNT(*) AS n FROM schema_migrations");
+    expect(Number(versions.rows[0].n)).toBe(2);
+    client.close();
+  });
 });

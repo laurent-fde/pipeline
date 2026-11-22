@@ -38,25 +38,30 @@ async function appliedVersion(client: Client): Promise<number | null> {
   return rows[0]?.v == null ? null : Number(rows[0].v);
 }
 
-export async function migrate(client: Client) {
+export async function migrate(client: Client, list: readonly string[] = migrations) {
   await client.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL)");
+  // Revue de #34 : une version ne peut être notée qu'une fois. Un second serveur qui rejoue une migration
+  // voit donc toujours sa transaction échouer et s'annuler, même si la migration elle-même est rejouable.
+  await client.execute(
+    "CREATE UNIQUE INDEX IF NOT EXISTS schema_migrations_version ON schema_migrations (version)",
+  );
   let applied = await appliedVersion(client);
   if (applied === null) {
     // Base créée avant schema_migrations : on reprend l'ancien compteur (le lire reste permis).
     const legacy = await client.execute("PRAGMA user_version");
     applied = Number(legacy.rows[0]?.user_version ?? 0);
     if (applied > 0) {
-      await client.execute({ sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [applied] });
+      await client.execute({ sql: "INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)", args: [applied] });
     }
   }
   // Chaque migration et sa version sont écrites ensemble (une transaction) : tout ou rien.
   // #34 : si un autre serveur, démarré en même temps, l'a appliquée entre-temps, la transaction échoue
   // et est annulée ; on relit alors où en est la base et on reprend après, au lieu de planter.
   let version = applied;
-  while (version < migrations.length) {
+  while (version < list.length) {
     try {
       await client.batch(
-        [migrations[version], { sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [version + 1] }],
+        [list[version], { sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [version + 1] }],
         "write",
       );
       version++;
