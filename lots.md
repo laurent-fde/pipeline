@@ -15,56 +15,81 @@ Découpage de Pipeline en lots, à partir d'`INTENT.md`. Un lot = une chose que 
 
 Je remplis un formulaire (nom, entreprise, e-mail, téléphone) et je valide. Le contact apparaît dans la liste, et il y est toujours après un redémarrage de l'app.
 
-- [ ] Étant donné le formulaire, quand je saisis un nom et que je valide, alors le contact apparaît dans la liste avec ses informations.
-- [ ] Étant donné un nom vide, quand je valide, alors « Le nom est obligatoire » s'affiche et rien n'est enregistré.
-- [ ] Étant donné un e-mail mal formé, quand je valide, alors « L'e-mail n'est pas valide » s'affiche et rien n'est enregistré.
-- [ ] Étant donné des contacts enregistrés, quand je redémarre l'app, alors ils sont toujours dans la liste.
+- [x] Étant donné le formulaire, quand je saisis un nom et que je valide, alors le contact apparaît dans la liste avec ses informations.
+  → `contact.service.test.ts` « enregistre un contact valide et le renvoie dans la liste avec ses informations » ; `contact.action.test.ts` « passe la saisie au service et rafraîchit la page quand l'ajout réussit » ; `new-contact-dialog.test.tsx` « ferme la fenêtre après un ajout réussi » ; `contact-card.test.tsx` « montre le nom et l'entreprise… » (coordonnées dans la fiche depuis le lot 9).
+- [x] Étant donné un nom vide, quand je valide, alors « Le nom est obligatoire » s'affiche et rien n'est enregistré.
+  → `contact.service.test.ts` « refuse un nom vide (%j) sans rien enregistrer » ; `contact-form.test.tsx` « affiche « Le nom est obligatoire » relié au champ Nom » ; `contact.action.test.ts` « renvoie les erreurs et la saisie sans rafraîchir quand le service refuse ».
+- [x] Étant donné un e-mail mal formé, quand je valide, alors « L'e-mail n'est pas valide » s'affiche et rien n'est enregistré.
+  → `contact.service.test.ts` « refuse l'e-mail mal formé %j sans rien enregistrer » ; `contact-form.test.tsx` « affiche « L'e-mail n'est pas valide » relié au champ E-mail, et garde la saisie ».
+- [x] Étant donné des contacts enregistrés, quand je redémarre l'app, alors ils sont toujours dans la liste.
+  → `contact.repository.test.ts` « retrouve les contacts après un redémarrage (nouvelle connexion au même fichier) ».
 
 ## Lot 2 · Voir les contacts par étape, en kanban
 
 Les contacts sont rangés en colonnes, une par étape. Un nouveau contact arrive dans la première colonne.
 
-- [ ] Étant donné l'app ouverte, quand j'affiche le tableau, alors je vois les colonnes Nouveau, Contacté, RDV, Proposition, Gagné et Perdu, dans cet ordre.
-- [ ] Étant donné un contact que je viens d'ajouter, quand j'affiche le tableau, alors il est dans la colonne Nouveau.
-- [ ] Étant donné des contacts, quand j'affiche le tableau, alors chaque colonne indique son nombre de contacts.
-- [ ] Étant donné aucun contact, quand j'ouvre l'app, alors un message invite à ajouter le premier contact.
+- [x] Étant donné l'app ouverte, quand j'affiche le tableau, alors je vois les colonnes Nouveau, Contacté, RDV, Proposition, Gagné et Perdu, dans cet ordre.
+  → `contact.service.test.ts` « renvoie les six étapes dans l'ordre, même sans contact » ; `kanban-board.test.tsx` « affiche les six colonnes dans l'ordre ».
+- [x] Étant donné un contact que je viens d'ajouter, quand j'affiche le tableau, alors il est dans la colonne Nouveau.
+  → `contact.service.test.ts` « enregistre un nouveau contact à l'étape « nouveau » et le range dans Nouveau » ; `kanban-board.test.tsx` « place chaque contact dans la colonne de son étape » ; `contact.repository.test.ts` « range dans « nouveau » les contacts d'une base créée avant les étapes ».
+- [x] Étant donné des contacts, quand j'affiche le tableau, alors chaque colonne indique son nombre de contacts.
+  → `contact.service.test.ts` « compte les contacts de chaque colonne » ; `kanban-board.test.tsx` « indique le nombre de contacts de chaque colonne, zéro compris ».
+- [x] Étant donné aucun contact, quand j'ouvre l'app, alors un message invite à ajouter le premier contact.
+  → `contact.service.test.ts` « indique un total de zéro quand il n'y a aucun contact » ; `kanban-board.test.tsx` « invite à ajouter le premier contact quand il n'y en a aucun, colonnes comprises ».
 
 ## Lot 3 · Faire avancer un contact d'étape
 
 Sur la carte d'un contact, je le fais passer à l'étape suivante, je le ramène à la précédente en cas d'erreur, ou je le marque perdu.
 
-- [ ] Étant donné un contact dans une colonne, quand je clique « Étape suivante », alors il passe dans la colonne suivante.
-- [ ] Étant donné un contact qui n'est ni dans Nouveau, ni dans Gagné ou Perdu, quand je clique « Étape précédente », alors il revient dans la colonne précédente. (Gagné et Perdu en sortent par « Rouvrir vers… », lot 7.)
-- [ ] Étant donné un contact à n'importe quelle étape, quand je clique « Marquer perdu », alors il passe dans la colonne Perdu.
-- [ ] Étant donné un contact dans Gagné ou Perdu, quand j'affiche sa carte, alors « Étape suivante » est indisponible.
-- [ ] Étant donné un contact déplacé, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
+- [x] Étant donné un contact dans une colonne, quand je clique « Étape suivante », alors il passe dans la colonne suivante.
+  → `contact.service.test.ts` « fait passer un contact de %s à %s » ; `stage-controls.test.tsx` « « Étape suivante » demande le déplacement next » ; `kanban-board.test.tsx` « demande l'étape suivante au service depuis la carte » ; `contact.action.test.ts` « passe le déplacement au service et rafraîchit la page… ».
+- [x] Étant donné un contact qui n'est ni dans Nouveau, ni dans Gagné ou Perdu, quand je clique « Étape précédente », alors il revient dans la colonne précédente. (Gagné et Perdu en sortent par « Rouvrir vers… », lot 7.)
+  → `contact.service.test.ts` « ramène un contact de %s à %s » et « refuse « Étape précédente » depuis %s… » ; `stage-controls.test.tsx` « « Étape précédente » demande le déplacement previous ».
+- [x] Étant donné un contact à n'importe quelle étape, quand je clique « Marquer perdu », alors il passe dans la colonne Perdu.
+  → `contact.service.test.ts` « marque perdu un contact à l'étape %s » ; `stage-controls.test.tsx` « « Marquer perdu » demande le déplacement lost ».
+- [x] Étant donné un contact dans Gagné ou Perdu, quand j'affiche sa carte, alors « Étape suivante » est indisponible.
+  → `contact.service.test.ts` « refuse « Étape suivante » depuis %s, sans rien enregistrer » ; `stage-controls.test.tsx` « rend indisponibles les déplacements interdits » ; `kanban-board.test.tsx` « met un bouton « étape suivante » sur la carte seulement quand le déplacement est permis ».
+- [x] Étant donné un contact déplacé, quand je redémarre l'app, alors il est toujours dans sa nouvelle colonne.
+  → `contact.repository.test.ts` « garde la nouvelle étape après un redémarrage ».
 
 ## Lot 4 · Fixer une relance et voir « À relancer aujourd'hui »
 
 Je fixe une date de relance sur un contact. Une section « À relancer » liste les contacts à relancer aujourd'hui ou en retard.
 
-- [ ] Étant donné un contact, quand je fixe sa relance à aujourd'hui, alors il apparaît dans « À relancer ».
-- [ ] Étant donné une relance à une date passée, quand j'ouvre l'app, alors le contact apparaît dans « À relancer » avec l'indication « en retard ».
-- [ ] Étant donné une relance à une date future, quand j'ouvre l'app, alors le contact n'apparaît pas dans « À relancer ».
-- [ ] Étant donné aucune relance due, quand j'ouvre l'app, alors « À relancer » affiche « Personne à relancer aujourd'hui ».
+- [x] Étant donné un contact, quand je fixe sa relance à aujourd'hui, alors il apparaît dans « À relancer ».
+  → `contact.service.test.ts` « fixe une relance à aujourd'hui et range le contact dans « À relancer » » ; `follow-up-form.test.tsx` « envoie la date choisie avec l'identifiant du contact » ; `follow-up-list.test.tsx` « liste les contacts à relancer ».
+- [x] Étant donné une relance à une date passée, quand j'ouvre l'app, alors le contact apparaît dans « À relancer » avec l'indication « en retard ».
+  → `contact.service.test.ts` « indique en retard une relance à une date passée » ; `follow-up-list.test.tsx` « indique « en retard » sur une relance passée ».
+- [x] Étant donné une relance à une date future, quand j'ouvre l'app, alors le contact n'apparaît pas dans « À relancer ».
+  → `contact.service.test.ts` « n'affiche pas une relance à une date future ».
+- [x] Étant donné aucune relance due, quand j'ouvre l'app, alors « À relancer » affiche « Personne à relancer aujourd'hui ».
+  → `contact.service.test.ts` « renvoie une liste vide quand aucune relance n'est due » ; `follow-up-list.test.tsx` « affiche « Personne à relancer aujourd'hui » quand la liste est vide ».
 
 ## Lot 5 · Marquer une relance comme faite
 
 Quand j'ai relancé quelqu'un, je le marque comme fait. Il passe « En attente de réponse » jusqu'à ce que je fixe la prochaine relance, sans changer de colonne.
 
-- [ ] Étant donné un contact dans « À relancer », quand je clique « Relance faite », alors il sort de « À relancer ».
-- [ ] Étant donné une relance marquée faite, quand j'affiche la carte du contact, alors elle porte le badge « En attente de réponse » et le contact reste dans sa colonne.
-- [ ] Étant donné un contact « En attente de réponse », quand je fixe une nouvelle date de relance, alors le badge disparaît et la nouvelle date remplace l'ancienne.
-- [ ] Étant donné un contact « En attente de réponse », quand je redémarre l'app, alors il porte toujours le badge.
+- [x] Étant donné un contact dans « À relancer », quand je clique « Relance faite », alors il sort de « À relancer ».
+  → `contact.service.test.ts` « sort de « À relancer » un contact dont la relance est faite » ; `follow-up-list.test.tsx` « propose « Relance faite » pour chaque contact et envoie son identifiant » ; `contact.action.test.ts` « passe le contact au service et rafraîchit la page ».
+- [x] Étant donné une relance marquée faite, quand j'affiche la carte du contact, alors elle porte le badge « En attente de réponse » et le contact reste dans sa colonne.
+  → `contact.service.test.ts` « laisse le contact dans sa colonne, en attente de réponse » ; `contact-card.test.tsx` « affiche « En attente de réponse » quand la relance est faite, et seulement alors ».
+- [x] Étant donné un contact « En attente de réponse », quand je fixe une nouvelle date de relance, alors le badge disparaît et la nouvelle date remplace l'ancienne.
+  → `contact.service.test.ts` « retire l'attente et remplace la date quand je fixe une nouvelle relance ».
+- [x] Étant donné un contact « En attente de réponse », quand je redémarre l'app, alors il porte toujours le badge.
+  → `contact.repository.test.ts` « garde l'attente de réponse après un redémarrage ».
 
 ## Lot 6 · Modifier ou supprimer un contact
 
 Je corrige les informations d'un contact, ou je le supprime après confirmation.
 
-- [ ] Étant donné un contact, quand je modifie son entreprise et que je valide, alors la carte affiche la nouvelle valeur.
-- [ ] Étant donné une modification avec un nom vide, quand je valide, alors « Le nom est obligatoire » s'affiche et rien ne change.
-- [ ] Étant donné un contact, quand je clique « Supprimer » puis confirme, alors il disparaît du tableau et de « À relancer ».
-- [ ] Étant donné la demande de confirmation, quand j'annule, alors le contact reste.
+- [x] Étant donné un contact, quand je modifie son entreprise et que je valide, alors la carte affiche la nouvelle valeur.
+  → `contact.service.test.ts` « enregistre la nouvelle entreprise, sans toucher à l'étape ni à la relance » ; `contact-actions.test.tsx` « ouvre le formulaire pré-rempli et envoie la modification… » ; `contact.repository.test.ts` « modifie les informations d'un contact… ».
+- [x] Étant donné une modification avec un nom vide, quand je valide, alors « Le nom est obligatoire » s'affiche et rien ne change.
+  → `contact.service.test.ts` « refuse un nom vide sans rien enregistrer » ; `contact-actions.test.tsx` « garde le formulaire ouvert et affiche l'erreur quand le nom est vide ».
+- [x] Étant donné un contact, quand je clique « Supprimer » puis confirme, alors il disparaît du tableau et de « À relancer ».
+  → `contact.service.test.ts` « supprime le contact du tableau et de « À relancer » » ; `contact-actions.test.tsx` « supprime le contact après confirmation » ; `contact.repository.test.ts` « supprime un contact ».
+- [x] Étant donné la demande de confirmation, quand j'annule, alors le contact reste.
+  → `contact-actions.test.tsx` « ne supprime rien si j'annule la confirmation ».
 
 ## Lot 7 · Rouvrir un contact Gagné ou Perdu
 
