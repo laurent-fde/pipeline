@@ -1,6 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Board, Contact } from "@/services/contact.service";
+import { allowedMoves, reopenTargets } from "@/services/stages";
 import { KanbanBoard } from "./kanban-board";
 
 afterEach(cleanup);
@@ -29,8 +30,15 @@ const contact = (id: string, name: string, stage: string): Contact => ({
 function board(contacts: Contact[]): Board {
   const columns = LABELS.map(([stage, label]) => {
     const inColumn = contacts.filter((c) => c.stage === stage);
-    const moves = { previous: stage !== "nouveau", next: stage !== "gagne" && stage !== "perdu", lost: stage !== "perdu" };
-    return { stage, label, count: inColumn.length, contacts: inColumn, moves, reopenTargets: [] };
+    // Les vraies règles de stages.ts, pour que la fixture ne dérive plus du service (#16).
+    return {
+      stage,
+      label,
+      count: inColumn.length,
+      contacts: inColumn,
+      moves: allowedMoves(stage),
+      reopenTargets: reopenTargets(stage),
+    };
   });
   return { columns, total: contacts.length };
 }
@@ -108,5 +116,33 @@ describe("couche présentation · KanbanBoard", () => {
     expect(suivante("Nouveau").disabled).toBe(false);
     expect(suivante("Gagné").disabled).toBe(true);
   });
-});
 
+  // #16 : les cibles de « Rouvrir vers… » de la colonne arrivent jusqu'aux cartes.
+  it("propose « Rouvrir vers… » sur une carte Perdu, pas sur une carte RDV", () => {
+    render(
+      <KanbanBoard
+        board={board([contact("1", "Claire Martin", "perdu"), contact("2", "Paul Durand", "rdv")])}
+        moveAction={vi.fn()}
+        reopenAction={vi.fn()}
+      />,
+    );
+
+    expect(within(column("Perdu")).getByRole("button", { name: /Rouvrir vers/ })).toBeDefined();
+    expect(within(column("RDV")).queryByRole("button", { name: /Rouvrir vers/ })).toBeNull();
+  });
+
+  it("n'active pas « Étape précédente » sur une carte Gagné ou Perdu", () => {
+    render(
+      <KanbanBoard
+        board={board([contact("1", "Claire Martin", "gagne"), contact("2", "Paul Durand", "perdu")])}
+        moveAction={vi.fn()}
+        reopenAction={vi.fn()}
+      />,
+    );
+
+    for (const label of ["Gagné", "Perdu"]) {
+      const precedente = within(column(label)).queryByRole("button", { name: "Étape précédente" }) as HTMLButtonElement | null;
+      expect(precedente === null || precedente.disabled).toBe(true);
+    }
+  });
+});
