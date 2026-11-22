@@ -24,6 +24,13 @@ const migrations = [
   `ALTER TABLE contacts ADD COLUMN follow_up_on TEXT`,
   // Lot 5 : la relance a été faite, on attend la réponse (0 ou 1).
   `ALTER TABLE contacts ADD COLUMN follow_up_done INTEGER NOT NULL DEFAULT 0`,
+  // #32 : nombre d'appels par clé (adresse IP) et par fenêtre de temps (début en millisecondes).
+  `CREATE TABLE rate_limits (
+    key TEXT NOT NULL,
+    window_start INTEGER NOT NULL,
+    count INTEGER NOT NULL,
+    PRIMARY KEY (key, window_start)
+  )`,
 ];
 
 async function appliedVersion(client: Client): Promise<number | null> {

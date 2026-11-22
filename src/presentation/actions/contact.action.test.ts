@@ -13,6 +13,13 @@ const { addContact, moveContact, reopenContact, dropContact, setFollowUp, markFo
   markFollowUpDone: vi.fn(),
   refresh: vi.fn(),
 }));
+// #32 : la limite d'appels et l'adresse du client, simulées.
+const { check, requestHeaders } = vi.hoisted(() => ({
+  check: vi.fn<(key: string) => Promise<{ ok: true } | { ok: false; error: string }>>(async () => ({ ok: true })),
+  requestHeaders: new Headers({ "x-forwarded-for": "203.0.113.7, 10.0.0.1" }),
+}));
+vi.mock("@/services/rate-limit.service", () => ({ getRateLimitService: () => ({ check }) }));
+vi.mock("next/headers", () => ({ headers: async () => requestHeaders }));
 
 vi.mock("@/services/contact.service", () => ({
   getContactService: () => ({ addContact, moveContact, reopenContact, dropContact, setFollowUp, markFollowUpDone, updateContact, deleteContact }),
@@ -287,3 +294,61 @@ describe("couche présentation · updateContactAction et deleteContactAction (lo
   });
 });
 
+// #32 : trop d'appels depuis la même adresse → rien n'est enregistré, un message l'explique.
+describe("couche présentation · actions · limite d'appels (#32)", () => {
+  const TOO_MANY = "Trop de modifications d'un coup. Attends une minute et réessaie.";
+  const ID = "00000000-0000-4000-8000-000000000001";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    check.mockResolvedValue({ ok: true });
+  });
+
+  it("compte les appels par adresse IP du client (la première de x-forwarded-for)", async () => {
+    addContact.mockResolvedValue({ ok: true, contact: {} });
+
+    await addContactAction({}, formData(saisie));
+
+    expect(check).toHaveBeenCalledWith("write:203.0.113.7");
+  });
+
+  it("refuse l'ajout au-delà de la limite et garde la saisie", async () => {
+    check.mockResolvedValue({ ok: false, error: TOO_MANY });
+
+    expect(await addContactAction({}, formData(saisie))).toEqual({ formError: TOO_MANY, values: saisie });
+    expect(addContact).not.toHaveBeenCalled();
+  });
+
+  it("refuse la modification au-delà de la limite", async () => {
+    check.mockResolvedValue({ ok: false, error: TOO_MANY });
+
+    const result = await updateContactAction({}, formData({ ...saisie, contactId: ID }));
+
+    expect(result.formError).toBe(TOO_MANY);
+    expect(updateContact).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["deleteContactAction", () => deleteContactAction(ID), deleteContact],
+    ["moveContactAction", () => moveContactAction(ID, "next"), moveContact],
+    ["reopenContactAction", () => reopenContactAction(ID, "rdv"), reopenContact],
+    ["dropContactAction", () => dropContactAction(ID, "rdv"), dropContact],
+    ["setFollowUpAction", () => setFollowUpAction({}, formData({ contactId: ID, date: "2026-11-30" })), setFollowUp],
+    ["markFollowUpDoneAction", () => markFollowUpDoneAction(ID), markFollowUpDone],
+  ] as const)("%s refuse au-delà de la limite, sans appeler le service", async (_name, call, serviceMethod) => {
+    check.mockResolvedValue({ ok: false, error: TOO_MANY });
+
+    expect(await call()).toEqual({ error: TOO_MANY });
+    expect(serviceMethod).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("laisse passer si le compteur est en panne (la base répondra elle-même)", async () => {
+    check.mockRejectedValue(new Error("base injoignable"));
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    moveContact.mockResolvedValue({ ok: true, contact: {} });
+
+    expect(await moveContactAction(ID, "next")).toEqual({});
+    expect(moveContact).toHaveBeenCalled();
+  });
+});
