@@ -24,11 +24,15 @@ export type { Contact };
 
 export { STAGES, type Move, type ReopenTarget, type Stage } from "./stages";
 
+// Lot 9 : l'état de la relance d'une carte, pour son badge. null : aucune relance, ou en attente de réponse.
+export type FollowUpState = "overdue" | "today" | "upcoming" | null;
+export type BoardContact = Contact & { followUp: FollowUpState };
+
 export type BoardColumn = {
   stage: Stage;
   label: string;
   count: number;
-  contacts: Contact[];
+  contacts: BoardContact[];
   moves: AllowedMoves;
   reopenTargets: ReopenTarget[];
   // Lot 8 : les colonnes où déposer les cartes de cette colonne.
@@ -36,6 +40,26 @@ export type BoardColumn = {
 };
 
 export type Board = { columns: BoardColumn[]; total: number };
+
+// Lot 9 : les indicateurs du haut de l'écran. winRate en %, null sans contact gagné ni perdu.
+export type Stats = {
+  total: number;
+  active: number;
+  due: number;
+  overdue: number;
+  waiting: number;
+  won: number;
+  lost: number;
+  winRate: number | null;
+};
+
+const CLOSED_STAGES: readonly string[] = ["gagne", "perdu"];
+
+function followUpState(contact: Contact, today: string): FollowUpState {
+  if (contact.awaitingReply || !contact.followUpOn) return null;
+  if (contact.followUpOn < today) return "overdue";
+  return contact.followUpOn === today ? "today" : "upcoming";
+}
 
 export type ContactErrors = { name?: string; company?: string; email?: string; phone?: string };
 
@@ -135,9 +159,12 @@ export function createContactService(repository: ContactRepository, now: () => D
 
     // Une colonne par étape, toujours les six, même vides. L'ordre des contacts reçu est conservé.
     async getBoard(): Promise<Board> {
+      const today = parisToday(now());
       const contacts = await repository.findAll();
       const columns = STAGES.map(({ id, label }) => {
-        const inColumn = contacts.filter((contact) => contact.stage === id);
+        const inColumn = contacts
+          .filter((contact) => contact.stage === id)
+          .map((contact) => ({ ...contact, followUp: followUpState(contact, today) }));
         return {
           stage: id,
           label,
@@ -232,6 +259,25 @@ export function createContactService(repository: ContactRepository, now: () => D
         )
         .sort((a, b) => a.followUpOn.localeCompare(b.followUpOn))
         .map((contact) => ({ contact, overdue: contact.followUpOn < today }));
+    },
+
+    async getStats(): Promise<Stats> {
+      const today = parisToday(now());
+      const contacts = await repository.findAll();
+      const states = contacts.map((contact) => followUpState(contact, today));
+      const won = contacts.filter((c) => c.stage === "gagne").length;
+      const lost = contacts.filter((c) => c.stage === "perdu").length;
+      const overdue = states.filter((s) => s === "overdue").length;
+      return {
+        total: contacts.length,
+        active: contacts.filter((c) => !CLOSED_STAGES.includes(c.stage)).length,
+        due: overdue + states.filter((s) => s === "today").length,
+        overdue,
+        waiting: contacts.filter((c) => c.awaitingReply).length,
+        won,
+        lost,
+        winRate: won + lost === 0 ? null : Math.round((won / (won + lost)) * 100),
+      };
     },
   };
 }

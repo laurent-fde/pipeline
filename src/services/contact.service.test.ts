@@ -613,3 +613,66 @@ describe("couche service · contact.service · glisser-déposer (lot 8)", () => 
     expect(repository.updateStage).not.toHaveBeenCalled();
   });
 });
+
+// Lot 9 : l'état de relance de chaque carte et les indicateurs, calculés par le service.
+describe("couche service · contact.service · refonte de l'interface (lot 9)", () => {
+  // Le 21 novembre 2026 à 10 h, heure de Paris.
+  const now = () => new Date("2026-11-21T09:00:00Z");
+  const serviceWith = (contacts: Contact[]) => createContactService(fakeRepository(contacts), now);
+  const ID4 = "00000000-0000-4000-8000-000000000004";
+  const ID5 = "00000000-0000-4000-8000-000000000005";
+
+  // Critère 4 : le badge de relance de la carte (en retard, aujourd'hui, à venir), décidé par le service.
+  it("donne à chaque carte l'état de sa relance : en retard, aujourd'hui, à venir, ou aucun", async () => {
+    const service = serviceWith([
+      aContact({ id: ID1, followUpOn: "2026-11-18" }),
+      aContact({ id: ID2, followUpOn: "2026-11-21" }),
+      aContact({ id: ID3, followUpOn: "2026-11-28" }),
+      aContact({ id: ID4 }),
+      aContact({ id: ID5, followUpOn: "2026-11-18", awaitingReply: true }),
+    ]);
+
+    const { columns } = await service.getBoard();
+    const byId = Object.fromEntries(columns.flatMap((c) => c.contacts).map((c) => [c.id, c.followUp]));
+
+    expect(byId).toEqual({ [ID1]: "overdue", [ID2]: "today", [ID3]: "upcoming", [ID4]: null, [ID5]: null });
+  });
+
+  // Critère 3 : les quatre indicateurs.
+  it("compte les contacts en cours, les relances dues, les attentes de réponse et le taux de gain", async () => {
+    const service = serviceWith([
+      aContact({ id: ID1, stage: "nouveau", followUpOn: "2026-11-18" }),
+      aContact({ id: ID2, stage: "rdv", followUpOn: "2026-11-21" }),
+      aContact({ id: ID3, stage: "proposition", followUpOn: "2026-11-15", awaitingReply: true }),
+      aContact({ id: ID4, stage: "gagne" }),
+      aContact({ id: ID5, stage: "perdu", followUpOn: "2026-11-30" }),
+    ]);
+
+    expect(await service.getStats()).toEqual({
+      total: 5,
+      active: 3,
+      due: 2,
+      overdue: 1,
+      waiting: 1,
+      won: 1,
+      lost: 1,
+      winRate: 50,
+    });
+  });
+
+  it("n'a pas de taux de gain tant qu'aucun contact n'est gagné ou perdu", async () => {
+    const service = serviceWith([aContact({ id: ID1, stage: "rdv" })]);
+
+    expect(await service.getStats()).toMatchObject({ total: 1, active: 1, won: 0, lost: 0, winRate: null });
+  });
+
+  it("arrondit le taux de gain à l'unité", async () => {
+    const service = serviceWith([
+      aContact({ id: ID1, stage: "gagne" }),
+      aContact({ id: ID2, stage: "perdu" }),
+      aContact({ id: ID3, stage: "perdu" }),
+    ]);
+
+    expect((await service.getStats()).winRate).toBe(33);
+  });
+});

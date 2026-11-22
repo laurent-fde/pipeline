@@ -11,9 +11,10 @@ import {
   setFollowUpAction,
   updateContactAction,
 } from "@/presentation/actions/contact.action";
-import { ContactForm } from "@/presentation/components/contact-form";
 import { FollowUpList } from "@/presentation/components/follow-up-list";
 import { KanbanBoard } from "@/presentation/components/kanban-board";
+import { NewContactDialog } from "@/presentation/components/new-contact-dialog";
+import { StatsBar } from "@/presentation/components/stats-bar";
 import { ThemeToggle } from "@/presentation/components/theme-toggle";
 
 // Lu à chaque requête : le tableau reflète toujours la base.
@@ -33,6 +34,12 @@ async function Board() {
   );
 }
 
+async function Stats() {
+  await connection();
+  const stats = await getContactService().getStats();
+  return <StatsBar stats={stats} />;
+}
+
 async function FollowUps() {
   await connection();
   const followUps = await getContactService().getFollowUps();
@@ -41,41 +48,46 @@ async function FollowUps() {
 
 export default function Home() {
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-10">
-      <header className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-3xl font-semibold">Pipeline</h1>
-          <p className="mt-1 text-muted-foreground">Mes contacts de prospection</p>
+    <>
+      {/* Lot 9 : barre du haut, toujours visible. */}
+      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <h1 className="font-heading text-xl font-semibold">Pipeline</h1>
+            <p className="truncate text-xs text-muted-foreground">Mes contacts de prospection</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <NewContactDialog action={addContactAction} />
+            <ThemeToggle />
+          </div>
         </div>
-        <ThemeToggle />
       </header>
 
-      <section aria-labelledby="ajout" className="grid gap-4">
-        <h2 id="ajout" className="font-heading text-lg font-semibold">
-          Ajouter un contact
-        </h2>
-        <div className="max-w-3xl">
-          <ContactForm action={addContactAction} />
-        </div>
-      </section>
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6">
+        <section aria-label="Indicateurs">
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement des indicateurs…</p>}>
+            <Stats />
+          </Suspense>
+        </section>
 
-      <section aria-labelledby="relances" className="grid gap-4">
-        <h2 id="relances" className="font-heading text-lg font-semibold">
-          À relancer
-        </h2>
-        <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement des relances…</p>}>
-          <FollowUps />
-        </Suspense>
-      </section>
+        <section aria-labelledby="relances" className="grid gap-3">
+          <h2 id="relances" className="font-heading text-base font-semibold">
+            À relancer
+          </h2>
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement des relances…</p>}>
+            <FollowUps />
+          </Suspense>
+        </section>
 
-      <section aria-labelledby="contacts" className="grid gap-4">
-        <h2 id="contacts" className="font-heading text-lg font-semibold">
-          Tableau
-        </h2>
-        <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement du tableau…</p>}>
-          <Board />
-        </Suspense>
-      </section>
-    </main>
+        <section aria-labelledby="contacts" className="grid gap-3">
+          <h2 id="contacts" className="font-heading text-base font-semibold">
+            Tableau
+          </h2>
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement du tableau…</p>}>
+            <Board />
+          </Suspense>
+        </section>
+      </main>
+    </>
   );
 }
