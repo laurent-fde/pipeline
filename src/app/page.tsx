@@ -1,8 +1,16 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { getContactService } from "@/services/contact.service";
-import { addContactAction } from "@/presentation/actions/contact.action";
+import {
+  addContactAction,
+  deleteContactAction,
+  markFollowUpDoneAction,
+  moveContactAction,
+  setFollowUpAction,
+  updateContactAction,
+} from "@/presentation/actions/contact.action";
 import { ContactForm } from "@/presentation/components/contact-form";
+import { FollowUpList } from "@/presentation/components/follow-up-list";
 import { KanbanBoard } from "@/presentation/components/kanban-board";
 import { ThemeToggle } from "@/presentation/components/theme-toggle";
 
@@ -10,7 +18,21 @@ import { ThemeToggle } from "@/presentation/components/theme-toggle";
 async function Board() {
   await connection();
   const board = await getContactService().getBoard();
-  return <KanbanBoard board={board} />;
+  return (
+    <KanbanBoard
+      board={board}
+      moveAction={moveContactAction}
+      followUpAction={setFollowUpAction}
+      updateAction={updateContactAction}
+      deleteAction={deleteContactAction}
+    />
+  );
+}
+
+async function FollowUps() {
+  await connection();
+  const followUps = await getContactService().getFollowUps();
+  return <FollowUpList followUps={followUps} doneAction={markFollowUpDoneAction} />;
 }
 
 export default function Home() {
@@ -31,6 +53,15 @@ export default function Home() {
         <div className="max-w-3xl">
           <ContactForm action={addContactAction} />
         </div>
+      </section>
+
+      <section aria-labelledby="relances" className="grid gap-4">
+        <h2 id="relances" className="font-heading text-lg font-semibold">
+          À relancer
+        </h2>
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Chargement des relances…</p>}>
+          <FollowUps />
+        </Suspense>
       </section>
 
       <section aria-labelledby="contacts" className="grid gap-4">

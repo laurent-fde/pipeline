@@ -1,4 +1,6 @@
 import type { Contact } from "@/services/contact.service";
+import type { ReactNode } from "react";
+import { Badge } from "@/presentation/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/presentation/components/ui/card";
 
 const initials = (name: string) =>
@@ -8,7 +10,8 @@ const initials = (name: string) =>
     .map((part) => part[0]?.toUpperCase())
     .join("");
 
-export function ContactCard({ contact }: { contact: Contact }) {
+// children : les actions posées sous la carte (étape, relance…).
+export function ContactCard({ contact, children }: { contact: Contact; children?: ReactNode }) {
   return (
     <Card size="sm">
       <CardHeader className="flex items-center gap-3">
@@ -24,6 +27,11 @@ export function ContactCard({ contact }: { contact: Contact }) {
             {contact.name}
           </CardTitle>
           {contact.company && <p className="truncate text-sm text-muted-foreground">{contact.company}</p>}
+          {contact.awaitingReply && (
+            <Badge variant="outline" className="mt-1 h-auto whitespace-normal">
+              En attente de réponse
+            </Badge>
+          )}
         </div>
       </CardHeader>
       {(contact.email || contact.phone) && (
@@ -32,6 +40,7 @@ export function ContactCard({ contact }: { contact: Contact }) {
           {contact.phone && <span>{contact.phone}</span>}
         </CardContent>
       )}
+      {children && <CardContent className="grid min-w-0 gap-2">{children}</CardContent>}
     </Card>
   );
 }

@@ -1,32 +1,41 @@
 import {
   createContactRepository,
   type Contact,
+  type ContactFields,
   type ContactRepository,
-  type NewContact,
 } from "@/data/contact.repository";
 import { z } from "zod";
+import { parisToday } from "./today";
+import { allowedMoves, FIRST_STAGE, MOVES, STAGES, targetStage, type AllowedMoves, type Move, type Stage } from "./stages";
 
 export type { Contact };
 
-// Les étapes du pipeline, dans l'ordre du tableau. « Perdu » est atteignable depuis n'importe quelle étape.
-export const STAGES = [
-  { id: "nouveau", label: "Nouveau" },
-  { id: "contacte", label: "Contacté" },
-  { id: "rdv", label: "RDV" },
-  { id: "proposition", label: "Proposition" },
-  { id: "gagne", label: "Gagné" },
-  { id: "perdu", label: "Perdu" },
-] as const;
+export { STAGES, type Move, type Stage } from "./stages";
 
-export type Stage = (typeof STAGES)[number]["id"];
-
-const FIRST_STAGE: Stage = "nouveau";
-
-export type BoardColumn = { stage: Stage; label: string; count: number; contacts: Contact[] };
+export type BoardColumn = { stage: Stage; label: string; count: number; contacts: Contact[]; moves: AllowedMoves };
 
 export type Board = { columns: BoardColumn[]; total: number };
 
 export type ContactErrors = { name?: string; email?: string };
+
+export type UpdateContactResult =
+  | { ok: true; contact: Contact }
+  | { ok: false; errors: ContactErrors; error?: string };
+
+export type DeleteContactResult = { ok: true } | { ok: false; error: string };
+
+export type MoveResult = { ok: true; contact: Contact } | { ok: false; error: string };
+
+const moveSchema = z.enum(MOVES);
+
+export type FollowUpInput = { date?: string };
+
+export type FollowUpResult = { ok: true; contact: Contact } | { ok: false; error: string };
+
+// Un contact à relancer : sa relance est aujourd'hui (à Paris) ou en retard.
+export type FollowUp = { contact: Contact; overdue: boolean };
+
+const followUpSchema = z.object({ date: z.iso.date({ error: "La date n'est pas valide" }) });
 
 export type AddContactResult = { ok: true; contact: Contact } | { ok: false; errors: ContactErrors };
 
@@ -47,7 +56,7 @@ export type ContactInput = { name?: string; company?: string; email?: string; ph
 // safeParse et non parse : une saisie refusée n'est pas une panne, on renvoie les erreurs.
 export function validateContactInput(
   input: ContactInput,
-): { ok: true; value: Omit<NewContact, "stage"> } | { ok: false; errors: ContactErrors } {
+): { ok: true; value: ContactFields } | { ok: false; errors: ContactErrors } {
   const result = contactSchema.safeParse(input);
   if (result.success) return { ok: true, value: result.data };
 
@@ -58,13 +67,26 @@ export function validateContactInput(
   return { ok: false, errors };
 }
 
-export function createContactService(repository: ContactRepository) {
+// now : l'horloge, remplacée dans les tests pour fixer « aujourd'hui ».
+export function createContactService(repository: ContactRepository, now: () => Date = () => new Date()) {
   return {
     async addContact(input: ContactInput): Promise<AddContactResult> {
       const result = validateContactInput(input);
       if (!result.ok) return result;
       // Un nouveau contact commence toujours à la première étape.
       return { ok: true, contact: await repository.insert({ ...result.value, stage: FIRST_STAGE }) };
+    },
+
+    // Mêmes règles qu'à l'ajout ; l'étape et la relance ne changent pas.
+    async updateContact(id: string, input: ContactInput): Promise<UpdateContactResult> {
+      const result = validateContactInput(input);
+      if (!result.ok) return result;
+      const contact = await repository.update(id, result.value);
+      return contact ? { ok: true, contact } : { ok: false, errors: {}, error: "Contact introuvable" };
+    },
+
+    async deleteContact(id: string): Promise<DeleteContactResult> {
+      return (await repository.delete(id)) ? { ok: true } : { ok: false, error: "Contact introuvable" };
     },
 
     listContacts(): Promise<Contact[]> {
@@ -76,9 +98,56 @@ export function createContactService(repository: ContactRepository) {
       const contacts = await repository.findAll();
       const columns = STAGES.map(({ id, label }) => {
         const inColumn = contacts.filter((contact) => contact.stage === id);
-        return { stage: id, label, count: inColumn.length, contacts: inColumn };
+        return { stage: id, label, count: inColumn.length, contacts: inColumn, moves: allowedMoves(id) };
       });
       return { columns, total: contacts.length };
+    },
+
+    // Étape suivante, précédente ou Perdu : la règle décide, la couche données enregistre.
+    async moveContact(id: string, move: Move): Promise<MoveResult> {
+      const parsedMove = moveSchema.safeParse(move);
+      if (!parsedMove.success) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: "Contact introuvable" };
+
+      const stage = targetStage(contact.stage, parsedMove.data);
+      if (!stage) return { ok: false, error: "Ce déplacement n'est pas possible" };
+
+      const moved = await repository.updateStage(id, stage);
+      return moved ? { ok: true, contact: moved } : { ok: false, error: "Contact introuvable" };
+    },
+
+    async setFollowUp(id: string, input: FollowUpInput): Promise<FollowUpResult> {
+      const parsed = followUpSchema.safeParse(input);
+      if (!parsed.success) return { ok: false, error: "La date n'est pas valide" };
+
+      // Une nouvelle date remplace l'ancienne et met fin à l'attente de réponse.
+      const contact = await repository.updateFollowUp(id, { date: parsed.data.date, awaitingReply: false });
+      return contact ? { ok: true, contact } : { ok: false, error: "Contact introuvable" };
+    },
+
+    // Relance faite : le contact attend une réponse, garde sa date et reste dans sa colonne.
+    async markFollowUpDone(id: string): Promise<FollowUpResult> {
+      const contact = await repository.findById(id);
+      if (!contact) return { ok: false, error: "Contact introuvable" };
+      if (!contact.followUpOn) return { ok: false, error: "Aucune relance à marquer comme faite" };
+
+      const updated = await repository.updateFollowUp(id, { date: contact.followUpOn, awaitingReply: true });
+      return updated ? { ok: true, contact: updated } : { ok: false, error: "Contact introuvable" };
+    },
+
+    // Relances dues aujourd'hui ou en retard, de la plus ancienne à la plus récente (hors attente de réponse).
+    async getFollowUps(): Promise<FollowUp[]> {
+      const today = parisToday(now());
+      const contacts = await repository.findAll();
+      return contacts
+        .filter(
+          (contact): contact is Contact & { followUpOn: string } =>
+            !contact.awaitingReply && !!contact.followUpOn && contact.followUpOn <= today,
+        )
+        .sort((a, b) => a.followUpOn.localeCompare(b.followUpOn))
+        .map((contact) => ({ contact, overdue: contact.followUpOn < today }));
     },
   };
 }

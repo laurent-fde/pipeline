@@ -1,6 +1,14 @@
 {
   "permissions": {
-    "allow": ["Bash(pnpm test *)", "Bash(pnpm lint)", "Bash(pnpm build)"],
-    "deny": ["Read(./.env)", "Read(./.env.*)"]
+    "allow": [
+      "Bash(pnpm test *)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm build)",
+      "Bash(pnpm typecheck)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ]
   }
 }

@@ -101,4 +101,88 @@ describe("couche données · contact.repository", () => {
     const repository = createContactRepository(open(url));
     expect(await repository.findAll()).toEqual([expect.objectContaining({ name: "Claire Martin", stage: "nouveau" })]);
   });
+
+  // Lot 3 · Critères 1 à 3 : l'étape enregistrée change, sans décision ici.
+  it("change l'étape d'un contact et le renvoie", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+
+    const moved = await repository.updateStage(saved.id, "rdv");
+
+    expect(moved).toEqual({ ...saved, stage: "rdv" });
+    expect(await repository.findById(saved.id)).toEqual({ ...saved, stage: "rdv" });
+  });
+
+  it("renvoie null pour un contact inconnu", async () => {
+    const repository = createContactRepository(open(":memory:"));
+
+    expect(await repository.findById("inconnu")).toBeNull();
+    expect(await repository.updateStage("inconnu", "rdv")).toBeNull();
+  });
+
+  // Lot 3 · Critère 5 : un contact déplacé est toujours dans sa nouvelle colonne après redémarrage.
+  it("garde la nouvelle étape après un redémarrage", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pipeline-"));
+    tempDirs.push(dir);
+    const url = `file:${join(dir, "pipeline.db")}`;
+
+    const avant = open(url);
+    const saved = await createContactRepository(avant).insert(claire);
+    await createContactRepository(avant).updateStage(saved.id, "proposition");
+    avant.client.close();
+
+    expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ stage: "proposition" });
+  });
+
+  // Lot 4 · Critère 1 et lot 5 : la date de relance et l'attente de réponse sont enregistrées et relues.
+  it("enregistre la relance et l'attente de réponse, absentes par défaut", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+    expect(saved).toMatchObject({ followUpOn: null, awaitingReply: false });
+
+    const updated = await repository.updateFollowUp(saved.id, { date: "2026-11-21", awaitingReply: true });
+
+    expect(updated).toEqual({ ...saved, followUpOn: "2026-11-21", awaitingReply: true });
+    expect(await repository.findAll()).toEqual([{ ...saved, followUpOn: "2026-11-21", awaitingReply: true }]);
+    expect(await repository.updateFollowUp("inconnu", { date: null, awaitingReply: false })).toBeNull();
+  });
+
+  // Lot 5 · Critère 4 : un contact en attente de réponse le reste après redémarrage.
+  it("garde l'attente de réponse après un redémarrage", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "pipeline-"));
+    tempDirs.push(dir);
+    const url = `file:${join(dir, "pipeline.db")}`;
+
+    const avant = open(url);
+    const saved = await createContactRepository(avant).insert(claire);
+    await createContactRepository(avant).updateFollowUp(saved.id, { date: "2026-11-21", awaitingReply: true });
+    avant.client.close();
+
+    expect(await createContactRepository(open(url)).findById(saved.id)).toMatchObject({ awaitingReply: true });
+  });
+
+  // Lot 6 · Critère 1 : les informations du contact sont modifiées, le reste est gardé.
+  it("modifie les informations d'un contact sans toucher à son étape ni à sa relance", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+    await repository.updateStage(saved.id, "rdv");
+    await repository.updateFollowUp(saved.id, { date: "2026-11-21", awaitingReply: false });
+
+    const updated = await repository.update(saved.id, { name: "Claire Martin", company: "Studio Nord", email: null, phone: null });
+
+    expect(updated).toMatchObject({ company: "Studio Nord", email: null, stage: "rdv", followUpOn: "2026-11-21" });
+    expect(await repository.findById(saved.id)).toEqual(updated);
+    expect(await repository.update("inconnu", claire)).toBeNull();
+  });
+
+  // Lot 6 · Critère 3 : le contact supprimé n'est plus en base.
+  it("supprime un contact", async () => {
+    const repository = createContactRepository(open(":memory:"));
+    const saved = await repository.insert(claire);
+
+    expect(await repository.delete(saved.id)).toBe(true);
+    expect(await repository.findAll()).toEqual([]);
+    expect(await repository.delete(saved.id)).toBe(false);
+  });
 });
+
