@@ -7,7 +7,8 @@ const LOCAL_DIR = ".data";
 const LOCAL_URL = `file:${LOCAL_DIR}/pipeline.db`;
 
 // Migrations numérotées : on n'en modifie jamais une, on en ajoute une à la fin.
-// PRAGMA user_version retient combien ont déjà été appliquées.
+// La table schema_migrations retient combien ont déjà été appliquées
+// (pas PRAGMA user_version : Turso Cloud refuse de l'écrire).
 const migrations = [
   `CREATE TABLE contacts (
     id TEXT PRIMARY KEY,
@@ -26,10 +27,22 @@ const migrations = [
 ];
 
 async function migrate(client: Client) {
-  const { rows } = await client.execute("PRAGMA user_version");
-  const applied = Number(rows[0]?.user_version ?? 0);
+  await client.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER NOT NULL)");
+  const { rows } = await client.execute("SELECT MAX(version) AS v FROM schema_migrations");
+  let applied = rows[0]?.v == null ? null : Number(rows[0].v);
+  if (applied === null) {
+    // Base créée avant schema_migrations : on reprend l'ancien compteur (le lire reste permis).
+    const legacy = await client.execute("PRAGMA user_version");
+    applied = Number(legacy.rows[0]?.user_version ?? 0);
+    if (applied > 0) {
+      await client.execute({ sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [applied] });
+    }
+  }
   for (let version = applied; version < migrations.length; version++) {
-    await client.batch([migrations[version], `PRAGMA user_version = ${version + 1}`], "write");
+    await client.batch(
+      [migrations[version], { sql: "INSERT INTO schema_migrations (version) VALUES (?)", args: [version + 1] }],
+      "write",
+    );
   }
 }
 
