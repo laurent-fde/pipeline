@@ -188,7 +188,7 @@ describe("couche présentation · KanbanBoard · glisser-déposer (lot 8)", () =
     fireEvent.drop(column("Contacté"), { dataTransfer: dataTransfer() });
 
     await vi.waitFor(() => expect(dropAction).toHaveBeenCalledWith("1", "contacte"));
-    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toBe("");
   });
 
   // Critère 3 : un dépôt refusé par le service est annoncé, la carte reste dans sa colonne.
@@ -219,5 +219,54 @@ describe("couche présentation · KanbanBoard · glisser-déposer (lot 8)", () =
     render(<KanbanBoard board={board(contacts)} moveAction={vi.fn()} dropAction={vi.fn()} />);
 
     expect(within(card("Claire Martin")).getByRole("button", { name: "Étape suivante" })).toBeDefined();
+  });
+
+  // #27 : pendant l'enregistrement d'un dépôt, un second dépôt est ignoré.
+  it("ignore un second dépôt tant que le premier est en cours d'enregistrement", async () => {
+    let finish: (state: { error?: string }) => void = () => {};
+    const dropAction = vi.fn(() => new Promise<{ error?: string }>((resolve) => (finish = resolve)));
+    render(<KanbanBoard board={board(contacts)} dropAction={dropAction} />);
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    fireEvent.drop(column("Contacté"), { dataTransfer: dataTransfer() });
+    await vi.waitFor(() => expect(card("Claire Martin").getAttribute("draggable")).toBe("false"));
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    fireEvent.drop(column("Perdu"), { dataTransfer: dataTransfer() });
+    expect(dropAction).toHaveBeenCalledTimes(1);
+
+    finish({});
+    await vi.waitFor(() => expect(card("Claire Martin").getAttribute("draggable")).toBe("true"));
+  });
+
+  // #27 : si la fin du glissement n'arrive pas à la carte (carte retirée), la fenêtre remet tout à zéro.
+  it("remet le tableau à zéro quand la fin du glissement arrive sur la fenêtre", () => {
+    render(<KanbanBoard board={board(contacts)} dropAction={vi.fn()} />);
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    expect(column("Contacté").dataset.drop).toBe("allowed");
+
+    fireEvent(window, new Event("dragend"));
+    expect(column("Contacté").dataset.drop).toBeUndefined();
+  });
+
+  // #28 : la place du message est réservée, et il n'est pas effacé au début d'un glissement.
+  it("garde le message à sa place au début d'un nouveau glissement, et l'efface au dépôt suivant", async () => {
+    const dropAction = vi
+      .fn<(id: string, stage: string) => Promise<{ error?: string }>>()
+      .mockResolvedValueOnce({ error: "Ce déplacement n'est pas possible" })
+      .mockResolvedValueOnce({});
+    render(<KanbanBoard board={board(contacts)} dropAction={dropAction} />);
+    const alert = screen.getByRole("alert");
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    fireEvent.drop(column("RDV"), { dataTransfer: dataTransfer() });
+    await vi.waitFor(() => expect(alert.textContent).toBe("Ce déplacement n'est pas possible"));
+
+    fireEvent.dragStart(card("Claire Martin"), { dataTransfer: dataTransfer() });
+    expect(screen.getByRole("alert").textContent).toBe("Ce déplacement n'est pas possible");
+
+    fireEvent.drop(column("Contacté"), { dataTransfer: dataTransfer() });
+    await vi.waitFor(() => expect(screen.getByRole("alert").textContent).toBe(""));
   });
 });

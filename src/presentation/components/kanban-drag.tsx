@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useTransition, type DragEvent, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useTransition, type DragEvent, type ReactNode } from "react";
 import type { MoveState } from "@/presentation/actions/contact.action";
 import type { Stage } from "@/services/contact.service";
 import { cn } from "@/presentation/lib/utils";
@@ -12,6 +12,8 @@ type Dragging = { id: string; from: Stage; targets: Stage[] };
 
 type DragContextValue = {
   dragging: Dragging | null;
+  // Un dépôt est en cours d'enregistrement : aucun nouveau glissement (#27).
+  pending: boolean;
   over: Stage | null;
   start: (dragging: Dragging) => void;
   end: () => void;
@@ -25,26 +27,45 @@ export function DragBoard({ dropAction, children }: { dropAction: DropAction; ch
   const [dragging, setDragging] = useState<Dragging | null>(null);
   const [over, setOver] = useState<Stage | null>(null);
   const [error, setError] = useState<string>();
-  const [, startTransition] = useTransition();
+  const [pending, startTransition] = useTransition();
 
   const end = () => {
     setDragging(null);
     setOver(null);
   };
 
+  // #27 : si la carte disparaît pendant le glissement (page rafraîchie), son dragend ne remonte plus.
+  // La fenêtre reçoit quand même la fin du glissement : on remet le tableau à zéro.
+  const dragActive = dragging !== null;
+  useEffect(() => {
+    if (!dragActive) return;
+    const reset = () => {
+      setDragging(null);
+      setOver(null);
+    };
+    window.addEventListener("dragend", reset);
+    window.addEventListener("drop", reset);
+    return () => {
+      window.removeEventListener("dragend", reset);
+      window.removeEventListener("drop", reset);
+    };
+  }, [dragActive]);
+
   const value: DragContextValue = {
     dragging,
+    pending,
     over,
+    // #28 : le message n'est pas effacé ici, pour ne pas décaler le tableau sous la carte.
     start: (next) => {
-      setError(undefined);
-      setDragging(next);
+      if (!pending) setDragging(next);
     },
     end,
     enter: setOver,
     drop: (stage) => {
       const current = dragging;
       end();
-      if (!current || stage === current.from) return;
+      if (!current || stage === current.from || pending) return;
+      setError(undefined);
       startTransition(async () => {
         const result = await dropAction(current.id, stage);
         setError(result?.error);
@@ -54,11 +75,10 @@ export function DragBoard({ dropAction, children }: { dropAction: DropAction; ch
 
   return (
     <DragContext.Provider value={value}>
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
+      {/* #28 : toujours présent, hauteur réservée : le message n'apparaît ni ne disparaît en décalant le tableau. */}
+      <p role="alert" className="min-h-5 text-sm text-destructive">
+        {error}
+      </p>
       {children}
     </DragContext.Provider>
   );
@@ -133,7 +153,7 @@ export function DraggableCard({
 
   return (
     <li
-      draggable
+      draggable={!drag.pending}
       onDragStart={(event) => {
         event.dataTransfer.setData("text/plain", id);
         event.dataTransfer.effectAllowed = "move";
